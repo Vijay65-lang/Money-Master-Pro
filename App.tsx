@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Home, Wallet, TrendingUp, Grid, Plus, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Bot, X, Settings, LogOut, User as UserIcon, Lock, ChevronRight, Globe, Moon, Sun, Edit2, LayoutDashboard, Eye, EyeOff, ShieldAlert, Cloud, Server, Database, AlertCircle, CheckCircle2, Mail, KeyRound, BarChart3, ExternalLink, MessageCircle, HelpCircle } from 'lucide-react';
+import { Home, Wallet, TrendingUp, Grid, Plus, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Bot, X, Settings, LogOut, User as UserIcon, Lock, ChevronRight, Globe, Moon, Sun, Edit2, LayoutDashboard, Eye, EyeOff, ShieldAlert, Cloud, Server, Database, AlertCircle, CheckCircle2, Mail, KeyRound, BarChart3, ExternalLink, MessageCircle, HelpCircle, Loader2 } from 'lucide-react';
 import { Transaction, TransactionType, ViewState, Category, UserProfile, CurrencyCode, CURRENCY_SYMBOLS } from './types';
 import { Investments } from './components/Investments';
 import { Tools } from './components/Tools';
@@ -152,6 +152,17 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
     const [loading, setLoading] = useState(false);
+    const [longLoad, setLongLoad] = useState(false);
+
+    useEffect(() => {
+        let t: any;
+        if(loading) {
+            t = setTimeout(() => setLongLoad(true), 2500);
+        } else {
+            setLongLoad(false);
+        }
+        return () => clearTimeout(t);
+    }, [loading]);
 
     // Handle Forgot Password
     const handleForgot = async (e: React.FormEvent) => {
@@ -338,7 +349,12 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
                             )}
 
                             <button disabled={loading} type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none mt-2 flex items-center justify-center gap-2 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-transform active:scale-95 text-sm uppercase tracking-wider">
-                                {loading ? 'Processing...' : (showForgot ? "Send Reset Link" : (isLogin ? "Log In" : "Create Account"))}
+                                {loading ? (
+                                    <div className="flex items-center justify-center gap-2">
+                                        <Loader2 className="animate-spin" size={18} />
+                                        <span>{longLoad ? "Waking up Secure Database..." : "Processing..."}</span>
+                                    </div>
+                                ) : (showForgot ? "Send Reset Link" : (isLogin ? "Log In" : "Create Account"))}
                             </button>
                         </form>
                     </div>
