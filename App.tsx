@@ -139,8 +139,7 @@ const Sidebar = ({ view, setView, handleLogout, user }: any) => (
 // --- AUTH COMPONENT ---
 
 const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
-    const [isLogin, setIsLogin] = useState(true); // Login vs Signup mode
-    const [showForgot, setShowForgot] = useState(false); // Forgot Password mode
+    const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
     
     // Inputs
     const [email, setEmail] = useState('');
@@ -165,8 +164,14 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
         return () => clearTimeout(t);
     }, [loading]);
 
+    const resetState = () => {
+        setError('');
+        setSuccessMsg('');
+        setPassword('');
+    };
+
     // Handle Forgot Password
-    const handleForgot = async (e: React.FormEvent) => {
+    const handleResetRequest = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setSuccessMsg('');
@@ -182,7 +187,7 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
         const { success, error } = await sbResetPassword(cleanEmail);
         setLoading(false);
         if (success) {
-            setSuccessMsg("Reset link sent! Check your email.");
+            setSuccessMsg("Reset link sent! Check your email to set a new password.");
         } else {
             setError(error || "Failed to send reset link.");
         }
@@ -210,13 +215,13 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
              return;
         }
 
-        if (!isLogin && name.length < 2) {
+        if (mode === 'signup' && name.length < 2) {
              setError("Please enter your name.");
              setLoading(false);
              return;
         }
 
-        if (isLogin) {
+        if (mode === 'login') {
             // LOGIN FLOW
             const { user, error } = await sbLogin(cleanEmail, password);
             setLoading(false);
@@ -234,7 +239,7 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
             } else if (success) {
                 if (msg) {
                     setSuccessMsg(msg);
-                    setIsLogin(true); // Switch to login mode
+                    setMode('login'); // Switch to login mode
                     setPassword(''); // Clear password
                 } else {
                     // Auto-login if no verification needed
@@ -258,8 +263,27 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
                     </div>
                 </div>
                 <h2 className="text-3xl font-extrabold text-center mb-2 text-gray-900 dark:text-white relative z-10 tracking-tight">Money Master Pro</h2>
-                <p className="text-center text-gray-500 mb-8 text-sm font-medium relative z-10">
-                   {showForgot ? 'Reset your password.' : (isLogin ? 'Welcome back! Log in to continue.' : 'Create your secure account.')}
+                
+                {/* MODE TABS - ONLY LOGIN / SIGNUP */}
+                {mode !== 'forgot' && (
+                    <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-6 relative z-10">
+                        <button 
+                            onClick={() => { setMode('login'); resetState(); }} 
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'login' ? 'bg-white dark:bg-gray-700 text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                        >
+                            Log In
+                        </button>
+                        <button 
+                            onClick={() => { setMode('signup'); resetState(); }} 
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'signup' ? 'bg-white dark:bg-gray-700 text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                        >
+                            Sign Up
+                        </button>
+                    </div>
+                )}
+
+                <p className="text-center text-gray-500 mb-6 text-sm font-medium relative z-10">
+                   {mode === 'forgot' ? 'Enter email to receive reset link.' : (mode === 'login' ? 'Welcome back! Log in to continue.' : 'Create your secure account.')}
                 </p>
 
                 {successMsg ? (
@@ -271,20 +295,20 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
                          <p className="text-sm text-gray-900 dark:text-white mb-4">
                             {successMsg}
                          </p>
-                         <button onClick={() => { setSuccessMsg(''); setShowForgot(false); setIsLogin(true); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors">
+                         <button onClick={() => { setSuccessMsg(''); setMode('login'); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors">
                              Back to Login
                          </button>
                     </div>
                 ) : (
                     <div className="relative z-10 animate-fade-in">
-                        <form onSubmit={showForgot ? handleForgot : handleAuth} className="space-y-4">
-                            {!isLogin && !showForgot && (
+                        <form onSubmit={mode === 'forgot' ? handleResetRequest : handleAuth} className="space-y-4">
+                            {mode === 'signup' && (
                                 <div>
                                     <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1.5 uppercase ml-1">Full Name</label>
                                     <input 
                                         className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 text-gray-900 dark:text-white font-bold outline-none focus:border-indigo-500 disabled:opacity-50 transition-colors"
                                         value={name} onChange={e => setName(e.target.value)}
-                                        required={!isLogin}
+                                        required={mode === 'signup'}
                                         placeholder="e.g. John Doe"
                                         disabled={loading}
                                     />
@@ -305,10 +329,10 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
                                 </div>
                             </div>
 
-                            {!showForgot && (
+                            {mode !== 'forgot' && (
                                 <div>
                                     <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1.5 uppercase ml-1">
-                                        {!isLogin ? "Create a Password" : "Password"}
+                                        {mode === 'signup' ? "Create a Password" : "Password"}
                                     </label>
                                     <div className="relative">
                                         <Lock className="absolute left-3.5 top-4 text-gray-400" size={20}/>
@@ -328,10 +352,23 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
                                             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                         </button>
                                     </div>
+                                    
+                                    {/* FORGOT PASSWORD LINK - LOGIN MODE ONLY */}
+                                    {mode === 'login' && (
+                                        <div className="flex justify-end mt-1">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => { setMode('forgot'); resetState(); }} 
+                                                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                            >
+                                                Forgot Password?
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
-                            {!isLogin && !showForgot && (
+                            {mode === 'signup' && (
                                 <div>
                                         <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1.5 uppercase ml-1">Select Currency</label>
                                         <div className="relative">
@@ -348,22 +385,25 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
                                 </div>
                             )}
 
-                            {isLogin && !showForgot && (
-                                <div className="text-right">
-                                    <button type="button" onClick={() => { setShowForgot(true); setError(''); }} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
-                                        Forgot Password?
-                                    </button>
-                                </div>
-                            )}
-
                             <button disabled={loading} type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none mt-2 flex items-center justify-center gap-2 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-transform active:scale-95 text-sm uppercase tracking-wider">
                                 {loading ? (
                                     <div className="flex items-center justify-center gap-2">
                                         <Loader2 className="animate-spin" size={18} />
-                                        <span>{longLoad ? "Waking up Secure Database..." : "Processing..."}</span>
+                                        <span>{longLoad ? "Securely Connecting..." : "Processing..."}</span>
                                     </div>
-                                ) : (showForgot ? "Send Reset Link" : (isLogin ? "Log In" : "Create Account"))}
+                                ) : (mode === 'forgot' ? "Send Reset Link" : (mode === 'login' ? "Log In" : "Create Account"))}
                             </button>
+
+                            {/* Back to Login (Forgot Mode) */}
+                            {mode === 'forgot' && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => { setMode('login'); resetState(); }}
+                                    className="w-full text-gray-500 font-bold py-2 hover:text-indigo-600 transition-colors text-sm"
+                                >
+                                    Back to Login
+                                </button>
+                            )}
                         </form>
                     </div>
                 )}
@@ -373,22 +413,6 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
                     <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 text-sm font-bold rounded-xl flex items-start gap-2 animate-fade-in border border-red-100 dark:border-red-900/50">
                         <AlertCircle size={18} className="shrink-0 mt-0.5" />
                         <span className="break-words">{error}</span>
-                    </div>
-                )}
-
-                {/* TOGGLE MODE */}
-                {!successMsg && !showForgot && (
-                    <div className="mt-6 text-center relative z-10">
-                        <button disabled={loading} onClick={() => { setIsLogin(!isLogin); setError(''); setSuccessMsg(''); }} className="text-sm font-bold text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50 transition-colors">
-                            {isLogin ? "New here? Create Account" : "Already have an account? Log In"}
-                        </button>
-                    </div>
-                )}
-                {showForgot && !successMsg && (
-                    <div className="mt-6 text-center relative z-10">
-                         <button disabled={loading} onClick={() => { setShowForgot(false); setError(''); }} className="text-sm font-bold text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50 transition-colors">
-                            Back to Login
-                        </button>
                     </div>
                 )}
             </div>
@@ -404,8 +428,15 @@ const ResetPasswordScreen = ({ onComplete, user }: { onComplete: () => void, use
     const [msg, setMsg] = useState('');
     const [showPass, setShowPass] = useState(false);
     
-    // We display the user's email if available, or allow them to type it if for some reason context is lost but session is active
-    const [emailDisplay, setEmailDisplay] = useState(user?.email || '');
+    // We display the user's email if available, or allow them to type it manually
+    const [emailDisplay, setEmailDisplay] = useState('');
+
+    // SYNC: If user info becomes available (via magic link session), fill the email
+    useEffect(() => {
+        if (user?.email) {
+            setEmailDisplay(user.email);
+        }
+    }, [user]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -423,6 +454,7 @@ const ResetPasswordScreen = ({ onComplete, user }: { onComplete: () => void, use
         setStatus('loading');
         setMsg('');
 
+        // NOTE: updatePassword requires an active session (e.g. from the reset link)
         const { error } = await sbUpdateUserPassword(newPassword);
 
         if(error) {
@@ -457,17 +489,19 @@ const ResetPasswordScreen = ({ onComplete, user }: { onComplete: () => void, use
                      </div>
                 ) : (
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Email Field - Primarily for verification visual */}
+                        {/* Email Field - Unlocked for manual entry */}
                         <div>
                             <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1.5 uppercase ml-1">Email Address</label>
                             <div className="relative">
                                 <Mail className="absolute left-3.5 top-4 text-gray-400" size={20}/>
                                 <input 
                                     type="email"
-                                    className="w-full bg-gray-100 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 pl-11 text-gray-500 dark:text-gray-400 font-bold outline-none cursor-not-allowed"
+                                    className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 pl-11 text-gray-900 dark:text-white font-bold outline-none focus:border-indigo-500 transition-colors"
                                     value={emailDisplay} 
-                                    readOnly
+                                    onChange={e => setEmailDisplay(e.target.value)}
+                                    required
                                     placeholder="Your Email"
+                                    // Removed disabled prop to allow typing even if loading or no session
                                 />
                             </div>
                         </div>
@@ -520,825 +554,315 @@ const ResetPasswordScreen = ({ onComplete, user }: { onComplete: () => void, use
     );
 };
 
-// --- APP COMPONENT ---
-
 const App = () => {
+  // State
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [view, setView] = useState<ViewState>(ViewState.AUTH);
+  const [view, setView] = useState<ViewState>(ViewState.HOME);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  
-  // Transaction Form State
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showAIChat, setShowAIChat] = useState(false); // AI Chat Modal
-  const [showPasswordModal, setShowPasswordModal] = useState(false); // Password Reset Modal
-  const [aiChatInput, setAiChatInput] = useState('');
-  const [transType, setTransType] = useState<TransactionType>(TransactionType.EXPENSE);
-  const [title, setTitle] = useState('');
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<string>('');
-  
-  // AI & Utils
-  const [aiResponse, setAiResponse] = useState('');
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [privacyMode, setPrivacyMode] = useState(false);
-  
-  // Change Password State
-  const [newPassword, setNewPassword] = useState('');
-  const [passMsg, setPassMsg] = useState<{type: 'success'|'error', text: string}|null>(null);
+  const [loading, setLoading] = useState(true);
+  const [resetMode, setResetMode] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Inactivity Timer
-  const lastActivity = useRef(Date.now());
-  
-  // ⚡️ RACE CONDITION FIX & MANUAL TEST SUPPORT
-  const isRecoveryMode = useRef(
-    window.location.hash.includes('type=recovery') || 
-    window.location.hash === '#reset-password'
-  );
-
-  const handleLogin = async (loggedInUser: UserProfile) => {
-    setUser(loggedInUser);
-    setPrivacyMode(loggedInUser.privacyMode || false);
-    secureSave('mmp_current_user', loggedInUser);
-    
-    // 1. Load Local Backup First (Fast & Offline)
-    const localTx = secureLoad(`mmp_transactions_${loggedInUser.id}`) || [];
-    setTransactions(localTx);
-    
-    // 2. Try Loading from Cloud
-    const cloudTx = await sbLoadTransactions(loggedInUser.id);
-    if(cloudTx.length > 0) {
-        setTransactions(cloudTx);
-    }
-    
-    // ⚡️ IF this was a recovery link, Force Reset Password View
-    if (isRecoveryMode.current) {
-        setView(ViewState.RESET_PASSWORD);
-        isRecoveryMode.current = false;
-        window.history.replaceState(null, '', window.location.pathname);
-    } else {
-        setView(ViewState.HOME);
-    }
-  };
-  
-  const handleLogout = async () => {
-    try {
-        await sbLogout();
-    } catch (e) {
-        console.warn("Logout error:", e);
-    }
-    setUser(null);
-    setTransactions([]);
-    localStorage.removeItem('mmp_current_user');
-    setView(ViewState.AUTH);
-  };
-
-  // --- SESSION CHECKER ---
+  // Auth & Data Load Effect
   useEffect(() => {
-    let mounted = true;
-
-    // Direct Access Check for UI testing or Manual Navigation
-    if (window.location.hash === '#reset-password') {
-        setView(ViewState.RESET_PASSWORD);
-        isRecoveryMode.current = true;
+    // Handle Magic Link / Recovery
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setResetMode(true);
+      setLoading(false);
+      return;
     }
 
     const initAuth = async () => {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user && !user && mounted) {
-            const profile = await sbGetOrCreateProfile(session.user);
-            if (profile) {
-                handleLogin(profile);
-                return;
-            }
+        if (session?.user) {
+           const profile = await sbGetOrCreateProfile(session.user);
+           if (profile) {
+               setUser(profile);
+               const txs = await sbLoadTransactions(profile.id);
+               setTransactions(txs);
+           }
         }
-        const localUser = secureLoad('mmp_current_user');
-        if (localUser && !user && mounted) {
-             handleLogin(localUser);
-        }
+        setLoading(false);
     };
-
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-             if (!user && mounted) {
-                 const profile = await sbGetOrCreateProfile(session.user);
-                 if (profile) handleLogin(profile);
-             }
-        }
         if (event === 'PASSWORD_RECOVERY') {
-            isRecoveryMode.current = true;
-            setView(ViewState.RESET_PASSWORD); // ⚡️ DIRECTLY SWITCH TO RESET VIEW
-        }
-        if (event === 'SIGNED_OUT' && mounted) {
-            setUser(null);
-            // ⚡️ CRITICAL FIX: Do NOT switch to AUTH if we are in recovery mode.
-            if (!isRecoveryMode.current) {
-                setView(ViewState.AUTH);
+            setResetMode(true);
+        } else if (event === 'SIGNED_IN' && session?.user) {
+            setLoading(true);
+            const profile = await sbGetOrCreateProfile(session.user);
+            if (profile) {
+                setUser(profile);
+                const txs = await sbLoadTransactions(profile.id);
+                setTransactions(txs);
             }
+            setLoading(false);
+        } else if (event === 'SIGNED_OUT') {
+            setUser(null);
+            setTransactions([]);
+            setView(ViewState.HOME);
         }
     });
 
-    return () => { 
-        mounted = false; 
-        subscription.unsubscribe(); 
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
-  const handleActivity = useCallback(() => {
-      lastActivity.current = Date.now();
-  }, []);
-
+  // Theme Sync
   useEffect(() => {
-    window.addEventListener('mousemove', handleActivity);
-    window.addEventListener('keydown', handleActivity);
-    const interval = setInterval(() => {
-        if (user && Date.now() - lastActivity.current > INACTIVITY_LIMIT) {
-            handleLogout();
-        }
-    }, 10000); 
-    return () => {
-        window.removeEventListener('mousemove', handleActivity);
-        window.removeEventListener('keydown', handleActivity);
-        clearInterval(interval);
-    };
-  }, [user, handleActivity]);
+     if(user?.theme === 'dark') document.documentElement.classList.add('dark');
+     else document.documentElement.classList.remove('dark');
+  }, [user?.theme]);
 
-  useEffect(() => {
-    if (user) {
-        if (user.theme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    }
-  }, [user]);
-
-  useEffect(() => {
-      if(user && transactions.length > 0) {
-          secureSave(`mmp_transactions_${user.id}`, transactions);
-      }
-  }, [transactions, user]);
-
-  const updateUser = async (updates: Partial<UserProfile>) => {
-      if (!user) return;
-      const updated = { ...user, ...updates };
-      setUser(updated);
-      secureSave('mmp_current_user', updated);
-      await sbUpdateProfile(user.id, updated);
+  // Handlers
+  const handleLogout = async () => {
+      await sbLogout();
   };
 
-  const togglePrivacy = () => {
-      const newVal = !privacyMode;
-      setPrivacyMode(newVal);
-      updateUser({ privacyMode: newVal });
-  };
-  
-  const changePassword = async () => {
-      if(newPassword.length < 6) {
-          setPassMsg({type: 'error', text: "Password must be at least 6 characters"});
-          return;
-      }
-      setPassMsg(null);
-      const { error } = await sbUpdateUserPassword(newPassword);
-      if(error) {
-          setPassMsg({type: 'error', text: error});
-      } else {
-          setPassMsg({type: 'success', text: "Password updated successfully!"});
-          setNewPassword('');
-          setTimeout(() => {
-              setShowPasswordModal(false);
-              setPassMsg(null);
-          }, 1500);
-      }
+  const handleAddTx = async (title: string, amount: number, type: TransactionType) => {
+     if(!user) return;
+     let category = type === TransactionType.INCOME ? Category.SALARY : Category.OTHERS;
+     if(type === TransactionType.EXPENSE) {
+         // Optimistic UI update could happen here, but we wait for category for better UX
+         const catStr = await categorizeExpense(title);
+         category = catStr as Category; 
+     }
+     
+     const newTx: Transaction = {
+         id: crypto.randomUUID(),
+         title,
+         amount,
+         type,
+         category,
+         date: new Date().toISOString()
+     };
+     
+     const updated = [newTx, ...transactions];
+     setTransactions(updated);
+     await sbSaveTransaction(user.id, newTx);
   };
 
-  const addTransaction = async () => {
-    if (!title || !amount || !user) return;
-    const newTrans: Transaction = {
-      id: Date.now().toString(),
-      title,
-      amount: parseFloat(amount),
-      type: transType,
-      category: category || (transType === TransactionType.EXPENSE ? await categorizeExpense(title) : 'Income'),
-      date: new Date().toISOString(),
-    };
-    const updated = [newTrans, ...transactions];
-    setTransactions(updated);
-    await sbSaveTransaction(user.id, newTrans);
-    setTitle('');
-    setAmount('');
-    setCategory('');
-    setShowAddModal(false);
-  };
-
-  const deleteTransaction = async (id: string) => {
-      if(!user) return;
+  const handleDeleteTx = async (id: string) => {
       const updated = transactions.filter(t => t.id !== id);
       setTransactions(updated);
       await sbDeleteTransaction(id);
   };
 
-  const getBalance = () => {
-    const income = transactions.filter(t => t.type === TransactionType.INCOME).reduce((acc, t) => acc + t.amount, 0);
-    const expense = transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((acc, t) => acc + t.amount, 0);
-    return { income, expense, balance: income - expense };
-  };
+  if (loading) return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center gap-4">
+          <Loader2 className="animate-spin text-indigo-600" size={40} />
+          <p className="text-gray-500 font-bold animate-pulse">Loading Finances...</p>
+      </div>
+  );
 
-  const askAI = async (customQuery?: string) => {
-    if (!user) return;
-    setLoadingAI(true);
-    const { balance } = getBalance();
-    const context = `User: ${user.name}, Currency: ${user.currency}, Balance: ${balance}. Transactions: ${transactions.length}`;
-    const query = customQuery || "Give me a brief summary of my financial health.";
-    const advice = await getFinancialAdvice(query, context);
-    setAiResponse(advice);
-    setLoadingAI(false);
-  };
+  if (resetMode) return <ResetPasswordScreen onComplete={() => setResetMode(false)} user={user} />;
+  
+  if (!user) return <AuthScreen onLogin={setUser} />;
 
-  const { income, expense, balance } = getBalance();
+  const income = transactions.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);
+  const expense = transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
+  const balance = income - expense;
 
-  if (view === ViewState.AUTH) {
-    return <AuthScreen onLogin={handleLogin} />;
-  }
-
-  // --- RENDERERS ---
-
-  if (view === ViewState.RESET_PASSWORD) {
-      return <ResetPasswordScreen onComplete={() => setView(ViewState.HOME)} user={user} />;
-  }
-
-  const renderHome = () => {
-      const chartData = [
-          { name: 'Income', value: income, fill: '#10b981' },
-          { name: 'Expenses', value: expense, fill: '#ef4444' }
-      ];
-
-      // EXPENSE PIE DATA FOR DASHBOARD
-      const expenses = transactions.filter(t => t.type === TransactionType.EXPENSE);
-      const expenseTotals: Record<string, number> = {};
-      expenses.forEach(t => { expenseTotals[t.category] = (expenseTotals[t.category] || 0) + t.amount; });
-      const pieData = Object.keys(expenseTotals).map(cat => ({ name: cat, value: expenseTotals[cat] })).sort((a,b) => b.value - a.value).slice(0, 5);
-      const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'];
-
-      return (
-        <div className="space-y-6 md:space-y-8 animate-fade-in max-w-7xl mx-auto w-full">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Daily Overview</h2>
-                    <p className="text-gray-500 text-sm font-medium flex items-center gap-2 mt-1">
-                        <span className="text-emerald-500 font-bold flex items-center gap-1"><Cloud size={12}/> {user?.cloudConnected ? 'Cloud Sync Active' : 'Offline Mode'}</span>
-                    </p>
-                </div>
-                <div className="flex gap-3">
-                    <button onClick={togglePrivacy} className="bg-white dark:bg-gray-800 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
-                        {privacyMode ? <EyeOff size={20}/> : <Eye size={20}/>}
-                    </button>
-                </div>
-            </div>
-
-            {/* MOBILE QUICK ACTIONS (LARGE BUTTONS) */}
-            <div className="grid grid-cols-2 gap-4 md:hidden">
-                <button 
-                    onClick={() => { setTransType(TransactionType.EXPENSE); setShowAddModal(true); }} 
-                    className="flex flex-col items-center justify-center gap-2 p-5 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform"
-                >
-                    <div className="bg-white dark:bg-rose-900/50 p-2 rounded-full"><Plus size={24}/></div>
-                    <span>Add Expense</span>
-                </button>
-                <button 
-                    onClick={() => { setTransType(TransactionType.INCOME); setShowAddModal(true); }} 
-                    className="flex flex-col items-center justify-center gap-2 p-5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform"
-                >
-                    <div className="bg-white dark:bg-emerald-900/50 p-2 rounded-full"><Plus size={24}/></div>
-                    <span>Add Income</span>
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard title="Total Balance" amount={Number(balance)} type="neutral" currency={user!.currency} privacyMode={privacyMode} />
-                <StatCard title="Monthly Income" amount={Number(income)} type="success" currency={user!.currency} privacyMode={privacyMode} />
-                <StatCard title="Monthly Expenses" amount={Number(expense)} type="danger" currency={user!.currency} privacyMode={privacyMode} />
-            </div>
-            
-            <div className="hidden md:flex justify-end">
-                 <button onClick={() => { setTransType(TransactionType.EXPENSE); setShowAddModal(true); }} className="bg-gray-900 dark:bg-white text-white dark:text-black px-6 py-3.5 rounded-2xl font-bold shadow-lg shadow-gray-200 dark:shadow-none flex items-center gap-2 hover:-translate-y-1 transition-transform">
-                        <Plus size={20} /> Add New Transaction
-                 </button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-8">
-                    {/* CHART SECTION */}
-                    <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-8 shadow-sm border border-gray-100 dark:border-gray-800">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400"><BarChart3 size={18}/></div>
-                            Cash Flow Trend
-                        </h3>
-                        <div className="h-64 w-full" style={{ minHeight: '250px' }}>
-                            {income === 0 && expense === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center text-gray-400 font-medium">
-                                    <BarChart3 size={40} className="mb-2 opacity-20"/>
-                                    Add transactions to see trends
-                                </div>
-                            ) : (
-                                <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-                                    <BarChart data={chartData} layout="vertical" barSize={36}>
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} opacity={0.1} />
-                                        <XAxis type="number" hide />
-                                        <YAxis dataKey="name" type="category" width={80} tick={{fill: '#6b7280', fontSize: 12, fontWeight: '600'}} axisLine={false} tickLine={false} />
-                                        <Tooltip 
-                                            cursor={{fill: 'transparent'}}
-                                            contentStyle={{
-                                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                                borderRadius: '16px',
-                                                border: 'none',
-                                                boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
-                                                padding: '12px 16px'
-                                            }}
-                                            itemStyle={{ color: '#111827', fontWeight: 'bold', fontSize: '14px' }}
-                                            formatter={(val: any) => formatCurrency(Number(val), user!.currency, privacyMode)}
-                                        />
-                                        <Bar dataKey="value" radius={[0, 12, 12, 0] as any} background={{ fill: '#f3f4f6', radius: 12 }} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* NEW PIE CHART CARD ON DASHBOARD */}
-                    <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-8 shadow-sm border border-gray-100 dark:border-gray-800">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                            <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400"><PieChart size={18}/></div>
-                            Spending Breakdown
-                        </h3>
-                        {pieData.length > 0 ? (
-                            <div className="flex flex-col md:flex-row items-center gap-8">
-                                <div className="h-48 w-48 relative">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <RePieChart>
-                                            <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value" stroke="none">
-                                                {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                            </Pie>
-                                            <Tooltip formatter={(val: any) => formatCurrency(Number(val), user!.currency, privacyMode)} />
-                                        </RePieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                                <div className="flex-1 grid grid-cols-2 gap-3 w-full">
-                                    {pieData.map((entry, index) => (
-                                        <div key={index} className="flex items-center gap-2">
-                                            <div className="w-3 h-3 rounded-full shrink-0" style={{backgroundColor: COLORS[index % COLORS.length]}}></div>
-                                            <div className="overflow-hidden">
-                                                <p className="text-[10px] font-bold text-gray-500 uppercase truncate">{entry.name}</p>
-                                                <p className="text-xs font-bold text-gray-900 dark:text-white">{formatCurrency(entry.value, user!.currency, privacyMode)}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ) : (
-                            <p className="text-center text-gray-400 font-medium py-10">No expense data to analyze yet.</p>
-                        )}
-                    </div>
-
-                    <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-8 shadow-sm border border-gray-100 dark:border-gray-800">
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Recent Activity</h3>
-                        {transactions.length === 0 ? (
-                            <div className="text-center py-12 text-gray-400">
-                                <p className="font-bold">No transactions yet.</p>
-                                <p className="text-sm">Tap "Add New" to start tracking.</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {transactions.slice(0, 5).map(t => (
-                                    <div key={t.id} className="flex justify-between items-center p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-2xl transition-all border border-gray-50 dark:border-gray-800 group">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`p-3.5 rounded-full ${t.type === TransactionType.INCOME ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'}`}>
-                                                {t.type === TransactionType.INCOME ? <ArrowUpCircle size={20} /> : <ArrowDownCircle size={20} />}
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{t.title}</p>
-                                                <p className="text-xs text-gray-500 font-medium mt-0.5">{t.category} • {new Date(t.date).toLocaleDateString()}</p>
-                                            </div>
-                                        </div>
-                                        <span className={`font-bold text-lg ${t.type === TransactionType.INCOME ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-900 dark:text-white'}`}>
-                                            {t.type === TransactionType.INCOME ? '+' : '-'}{formatCurrency(t.amount, user!.currency, privacyMode)}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="space-y-6">
-                    <div className="bg-gradient-to-br from-gray-900 to-black dark:from-gray-800 dark:to-gray-900 rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden ring-1 ring-white/10">
-                        <div className="relative z-10">
-                            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">My Net Balance</p>
-                            <h3 className="text-4xl font-extrabold mb-6 tracking-tight">{formatCurrency(balance, user!.currency, privacyMode)}</h3>
-                            
-                            <div className="mb-6">
-                                <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 mb-2">
-                                    <span>Savings Rate</span>
-                                    <span className="text-white">{income > 0 ? ((balance/income)*100).toFixed(0) : 0}%</span>
-                                </div>
-                                <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500" style={{width: `${Math.min(100, Math.max(0, income > 0 ? (balance/income)*100 : 0))}%`}}></div>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-6 pt-2">
-                                <div>
-                                    <p className="text-xs text-emerald-400 font-bold uppercase mb-1">Income</p>
-                                    <p className="font-bold text-lg">{formatCurrency(income, user!.currency, privacyMode)}</p>
-                                </div>
-                                <div className="w-px bg-gray-800"></div>
-                                <div>
-                                    <p className="text-xs text-rose-400 font-bold uppercase mb-1">Expense</p>
-                                    <p className="font-bold text-lg">{formatCurrency(expense, user!.currency, privacyMode)}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500 rounded-full blur-[60px] opacity-20 -mr-16 -mt-16 pointer-events-none"></div>
-                        <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500 rounded-full blur-[40px] opacity-20 -ml-10 -mb-10 pointer-events-none"></div>
-                    </div>
-
-                    <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Quick Navigation</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => { setView(ViewState.TOOLS); }} className="p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors text-center">Tools</button>
-                            <button onClick={() => { setView(ViewState.INVESTMENTS); }} className="p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 font-bold text-sm hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors text-center">Invest</button>
-                            <button onClick={() => { setView(ViewState.PROFILE); }} className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-center">Settings</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-      );
-  };
-
-  const renderManager = (currentType: TransactionType) => {
-    const filtered = transactions.filter(t => t.type === currentType);
-    const total = filtered.reduce((acc, t) => acc + t.amount, 0);
-
-    return (
-      <div className="space-y-6 animate-fade-in max-w-7xl mx-auto w-full">
-         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-             <div>
-                <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight capitalize">
-                    {currentType === TransactionType.EXPENSE ? 'My Expenses' : 'My Income'}
-                </h2>
-                <p className="text-gray-500 text-sm font-medium mt-1">
-                    Total {currentType === TransactionType.EXPENSE ? 'Spent' : 'Earned'}: <span className={`font-bold ${currentType === TransactionType.EXPENSE ? 'text-rose-600' : 'text-emerald-600'}`}>{formatCurrency(total, user!.currency, privacyMode)}</span>
-                </p>
-             </div>
-             <button onClick={() => { setTransType(currentType); setShowAddModal(true); }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl font-bold shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 transition-transform active:scale-95">
-                 <Plus size={20} /> Add {currentType === TransactionType.EXPENSE ? 'Expense' : 'Income'}
-             </button>
-         </div>
-
-         <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-800 min-h-[50vh] flex flex-col">
-             {filtered.length === 0 ? (
-                 <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-400 py-20">
-                     <div className="bg-gray-50 dark:bg-gray-800 w-24 h-24 rounded-full flex items-center justify-center mb-6">
-                        {currentType === TransactionType.EXPENSE ? <PieChart size={40} opacity={0.3}/> : <Wallet size={40} opacity={0.3}/>}
-                     </div>
-                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Records Found</h3>
-                     <p className="max-w-xs mx-auto">You haven't added any {currentType.toLowerCase()} records yet. Tap the button above to get started.</p>
+  return (
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 overflow-hidden font-sans selection:bg-indigo-100 dark:selection:bg-indigo-900">
+        <Sidebar view={view} setView={setView} handleLogout={handleLogout} user={user} />
+        
+        {/* Mobile Sidebar Overlay */}
+        {mobileMenuOpen && (
+             <div className="fixed inset-0 z-50 bg-black/50 md:hidden" onClick={() => setMobileMenuOpen(false)}>
+                 <div className="w-72 h-full bg-white dark:bg-gray-950 shadow-2xl animate-slide-right" onClick={e => e.stopPropagation()}>
+                      <Sidebar view={view} setView={(v: ViewState) => { setView(v); setMobileMenuOpen(false); }} handleLogout={handleLogout} user={user} />
                  </div>
-             ) : (
-                 <div className="space-y-3">
-                     {filtered.map(t => (
-                         <div key={t.id} className="group p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-800 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-lg transition-all flex items-center justify-between">
-                             <div className="flex items-center gap-4 overflow-hidden">
-                                 <div className={`shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-sm ${currentType === TransactionType.EXPENSE ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
-                                     {currentType === TransactionType.EXPENSE ? <ArrowDownCircle size={24}/> : <ArrowUpCircle size={24}/>}
+             </div>
+        )}
+
+        <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+            {/* Mobile Header */}
+            <div className="md:hidden flex items-center justify-between p-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0">
+                <span className="font-extrabold text-lg flex items-center gap-2">
+                    <Wallet className="text-indigo-600" /> Money Master
+                </span>
+                <button onClick={() => setMobileMenuOpen(true)} className="p-2 text-gray-600 dark:text-gray-300">
+                    <Grid />
+                </button>
+            </div>
+
+            <main className="flex-1 overflow-y-auto relative">
+                {view === ViewState.TOOLS && <Tools currency={user.currency} userId={user.id} privacyMode={user.privacyMode} />}
+                {view === ViewState.INVESTMENTS && <Investments currency={user.currency} privacyMode={user.privacyMode} />}
+                {view === ViewState.PROFILE && (
+                    <div className="p-8 max-w-2xl mx-auto animate-fade-in">
+                         <h2 className="text-3xl font-extrabold mb-8">Settings</h2>
+                         <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-8 shadow-sm border border-gray-100 dark:border-gray-800 space-y-6">
+                             <div className="flex items-center justify-between p-2">
+                                 <div className="flex items-center gap-3">
+                                     <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full"><EyeOff size={20}/></div>
+                                     <span className="font-bold text-lg">Privacy Mode</span>
                                  </div>
-                                 <div className="min-w-0">
-                                     <h4 className="font-bold text-lg text-gray-900 dark:text-white truncate">{t.title}</h4>
-                                     <div className="flex items-center gap-2 text-xs font-bold text-gray-500 mt-1">
-                                         <span className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded border border-gray-200 dark:border-gray-600">{t.category}</span>
-                                         <span className="opacity-60">{new Date(t.date).toLocaleDateString()}</span>
-                                     </div>
-                                 </div>
-                             </div>
-                             
-                             <div className="flex items-center gap-4 pl-2 shrink-0">
-                                 <span className={`font-extrabold text-xl md:text-2xl ${currentType === TransactionType.EXPENSE ? 'text-gray-900 dark:text-white' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                     {currentType === TransactionType.EXPENSE ? '-' : '+'}{formatCurrency(t.amount, user!.currency, privacyMode)}
-                                 </span>
                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); deleteTransaction(t.id); }}
-                                    className="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-                                    title="Delete"
+                                    onClick={() => {
+                                        const updated = { ...user, privacyMode: !user.privacyMode };
+                                        setUser(updated);
+                                        sbUpdateProfile(user.id, updated);
+                                    }}
+                                    className={`w-14 h-8 rounded-full transition-colors relative ${user.privacyMode ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
                                  >
-                                     <Trash2 size={18} />
+                                     <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${user.privacyMode ? 'translate-x-6' : ''}`} />
+                                 </button>
+                             </div>
+                             <div className="flex items-center justify-between p-2">
+                                 <div className="flex items-center gap-3">
+                                     <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full"><Moon size={20}/></div>
+                                     <span className="font-bold text-lg">Dark Mode</span>
+                                 </div>
+                                 <button 
+                                    onClick={() => {
+                                        const newTheme = user.theme === 'light' ? 'dark' : 'light';
+                                        const updated = { ...user, theme: newTheme };
+                                        setUser(updated);
+                                        sbUpdateProfile(user.id, updated);
+                                    }}
+                                    className={`w-14 h-8 rounded-full transition-colors relative ${user.theme === 'dark' ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
+                                 >
+                                     <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${user.theme === 'dark' ? 'translate-x-6' : ''}`} />
                                  </button>
                              </div>
                          </div>
-                     ))}
-                 </div>
-             )}
-         </div>
-      </div>
-    );
-  };
-
-  const renderProfile = () => {
-      if (!user) return null;
-      return (
-        <div className="space-y-8 animate-fade-in max-w-4xl mx-auto w-full">
-            <div>
-                <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Settings</h2>
-                <p className="text-gray-500 text-sm font-medium mt-1">Manage your account preferences.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Profile Card */}
-                <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 md:col-span-2 flex flex-col md:flex-row items-center gap-8">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-4xl font-bold text-white shadow-lg shadow-indigo-200 dark:shadow-none shrink-0">
-                        {user.name.charAt(0)}
                     </div>
-                    <div className="text-center md:text-left flex-1">
-                        <h3 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-1">{user.name}</h3>
-                        <p className="text-gray-500 font-medium mb-4">{user.email}</p>
-                        <div className="flex flex-wrap justify-center md:justify-start gap-2">
-                             <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-bold flex items-center gap-1">
-                                 <CheckCircle2 size={12}/> {user.cloudConnected ? 'Cloud Sync Active' : 'Offline'}
-                             </span>
-                             <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-full text-xs font-bold uppercase">
-                                 {user.currency}
-                             </span>
-                        </div>
-                    </div>
-                    <button onClick={handleLogout} className="bg-gray-100 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 text-gray-900 dark:text-white px-6 py-3 rounded-xl font-bold transition-all text-sm flex items-center gap-2">
-                        <LogOut size={18}/> Sign Out
-                    </button>
-                </div>
-
-                {/* Preferences */}
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 space-y-6">
-                     <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                         <Settings size={20} className="text-gray-400"/> General
-                     </h4>
-                     
-                     <div className="space-y-4">
-                         <div>
-                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Display Name</label>
-                             <div className="flex gap-2">
-                                 <input 
-                                    value={user.name} 
-                                    onChange={e => updateUser({ name: e.target.value })}
-                                    className="flex-1 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-indigo-500 rounded-xl px-4 py-2 font-bold text-gray-900 dark:text-white outline-none transition-colors"
-                                 />
-                                 <button className="bg-indigo-600 text-white p-2.5 rounded-xl"><Edit2 size={18}/></button>
-                             </div>
-                         </div>
-                         
-                         <div>
-                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Currency</label>
-                             <select 
-                                value={user.currency} 
-                                onChange={e => updateUser({ currency: e.target.value as CurrencyCode })}
-                                className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-indigo-500 rounded-xl px-4 py-3 font-bold text-gray-900 dark:text-white outline-none cursor-pointer appearance-none transition-colors"
-                             >
-                                 {Object.keys(CURRENCY_SYMBOLS).map(c => <option key={c} value={c}>{c} ({CURRENCY_SYMBOLS[c as CurrencyCode]})</option>)}
-                             </select>
-                         </div>
-                     </div>
-                </div>
-
-                {/* Appearance & Security */}
-                <div className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 space-y-6">
-                     <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                         <ShieldAlert size={20} className="text-gray-400"/> Appearance & Security
-                     </h4>
-
-                     <div className="space-y-3">
-                         <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                             <div className="flex items-center gap-3">
-                                 {user.theme === 'dark' ? <Moon size={20} className="text-indigo-600"/> : <Sun size={20} className="text-orange-500"/>}
-                                 <span className="font-bold text-sm">Dark Mode</span>
-                             </div>
-                             <button 
-                                onClick={() => updateUser({ theme: user.theme === 'dark' ? 'light' : 'dark' })}
-                                className={`w-12 h-7 rounded-full p-1 transition-colors ${user.theme === 'dark' ? 'bg-indigo-600' : 'bg-gray-300'}`}
-                             >
-                                 <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${user.theme === 'dark' ? 'translate-x-5' : ''}`}></div>
-                             </button>
-                         </div>
-
-                         <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                             <div className="flex items-center gap-3">
-                                 {privacyMode ? <EyeOff size={20} className="text-gray-600 dark:text-gray-400"/> : <Eye size={20} className="text-indigo-600"/>}
-                                 <span className="font-bold text-sm">Privacy Mode</span>
-                             </div>
-                             <button 
-                                onClick={togglePrivacy}
-                                className={`w-12 h-7 rounded-full p-1 transition-colors ${privacyMode ? 'bg-indigo-600' : 'bg-gray-300'}`}
-                             >
-                                 <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${privacyMode ? 'translate-x-5' : ''}`}></div>
-                             </button>
-                         </div>
-                         
-                         <button 
-                            onClick={() => setShowPasswordModal(true)}
-                            className="w-full flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-xl transition-colors group"
-                         >
-                             <div className="flex items-center gap-3">
-                                 <Lock size={20} className="text-indigo-600 dark:text-indigo-400"/>
-                                 <span className="font-bold text-sm text-indigo-900 dark:text-indigo-200">Change Password</span>
-                             </div>
-                             <ChevronRight size={18} className="text-indigo-400 group-hover:translate-x-1 transition-transform"/>
-                         </button>
-                     </div>
-                </div>
-            </div>
+                )}
+                
+                {/* DASHBOARD / EXPENSES / INCOME */}
+                {(view === ViewState.HOME || view === ViewState.EXPENSES || view === ViewState.INCOME) && (
+                    <DashboardContent 
+                        view={view} 
+                        user={user} 
+                        transactions={transactions} 
+                        balance={balance} 
+                        income={income} 
+                        expense={expense}
+                        onAddTx={handleAddTx}
+                        onDeleteTx={handleDeleteTx}
+                    />
+                )}
+            </main>
         </div>
-      );
-  };
-
-  return (
-    <div className="flex h-[100dvh] bg-slate-50 dark:bg-gray-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300 overflow-hidden">
-        <Sidebar view={view} setView={setView} handleLogout={handleLogout} user={user} />
-        
-        <main className="flex-1 overflow-y-auto overflow-x-hidden relative flex flex-col scroll-smooth">
-            <header className="md:hidden flex items-center justify-between p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20">
-                <div className="flex items-center gap-2 font-extrabold text-lg text-gray-900 dark:text-white">
-                    <div className="bg-indigo-600 text-white p-1.5 rounded-lg"><Wallet size={18} /></div> MMP
-                </div>
-                <div className="flex items-center gap-3">
-                     <button onClick={togglePrivacy} className="p-2 text-gray-600 dark:text-gray-300">
-                        {privacyMode ? <EyeOff size={20}/> : <Eye size={20}/>}
-                     </button>
-                     <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center font-bold text-indigo-700 dark:text-indigo-300 text-sm">
-                        {user?.name.charAt(0)}
-                     </div>
-                </div>
-            </header>
-
-            <div className="flex-1 p-4 md:p-10 flex flex-col max-w-[1600px] mx-auto w-full pb-24 md:pb-10">
-                {view === ViewState.HOME && renderHome()}
-                {view === ViewState.EXPENSES && renderManager(TransactionType.EXPENSE)}
-                {view === ViewState.INCOME && renderManager(TransactionType.INCOME)}
-                {view === ViewState.INVESTMENTS && <Investments currency={user!.currency} privacyMode={privacyMode} />}
-                {view === ViewState.TOOLS && <Tools currency={user!.currency} userId={user!.id} privacyMode={privacyMode} />}
-                {view === ViewState.PROFILE && renderProfile()}
-            </div>
-
-            <div className="md:hidden bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-2 flex justify-around sticky bottom-0 z-20 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-                <NavButton active={view === ViewState.HOME} onClick={() => setView(ViewState.HOME)} icon={Home} label="Home" />
-                <NavButton active={view === ViewState.TOOLS} onClick={() => setView(ViewState.TOOLS)} icon={Grid} label="Tools" />
-                <NavButton active={view === ViewState.EXPENSES || view === ViewState.INCOME} onClick={() => setView(ViewState.EXPENSES)} icon={PieChart} label="Money" />
-                <NavButton active={view === ViewState.INVESTMENTS} onClick={() => setView(ViewState.INVESTMENTS)} icon={TrendingUp} label="Invest" />
-                <NavButton active={view === ViewState.PROFILE} onClick={() => setView(ViewState.PROFILE)} icon={Settings} label="Settings" />
-            </div>
-        </main>
-
-        <button 
-            onClick={() => { setShowAIChat(true); setAiResponse(''); }}
-            className="fixed bottom-24 md:bottom-10 right-6 md:right-10 bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-2xl shadow-indigo-400/40 dark:shadow-indigo-900/40 z-30 transition-all hover:scale-110 active:scale-95 animate-fade-in group"
-        >
-            <MessageCircle size={28} fill="currentColor" className="group-hover:animate-pulse" />
-        </button>
-
-        {showAIChat && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-                <div className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-[2rem] p-6 shadow-2xl animate-slide-up border border-gray-100 dark:border-gray-800 flex flex-col max-h-[80vh]">
-                    <div className="flex justify-between items-center mb-6 border-b border-gray-100 dark:border-gray-800 pb-4">
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <Bot className="text-indigo-600 dark:text-indigo-400" size={24}/> Money Brain Chat
-                        </h3>
-                        <button onClick={() => setShowAIChat(false)} className="bg-gray-100 dark:bg-gray-800 p-2 rounded-full text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"><X size={20}/></button>
-                    </div>
-                    
-                    <div className="flex-1 overflow-y-auto min-h-[200px] mb-4 bg-indigo-50 dark:bg-gray-800/30 rounded-2xl p-4 custom-scrollbar">
-                        {aiResponse ? (
-                            <div className="text-gray-900 dark:text-white leading-relaxed whitespace-pre-line text-sm md:text-base">
-                                {aiResponse.split('**').map((part, i) => i % 2 === 1 ? <strong key={i}>{part}</strong> : part)}
-                            </div>
-                        ) : (
-                            <div className="text-center text-gray-400 mt-10">
-                                <p className="mb-2 text-lg font-bold">Ask me anything!</p>
-                                <p className="text-xs">"How can I save more?"</p>
-                                <p className="text-xs">"Explain crypto risks"</p>
-                                <p className="text-xs">"Plan a budget for $2000"</p>
-                            </div>
-                        )}
-                        {loadingAI && <div className="text-indigo-600 dark:text-indigo-400 font-bold text-center mt-4 animate-pulse">Thinking...</div>}
-                    </div>
-
-                    <div className="flex gap-2">
-                        <input 
-                            placeholder="Type your question..." 
-                            value={aiChatInput}
-                            onChange={e => setAiChatInput(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && !loadingAI && askAI(aiChatInput)}
-                            className="flex-1 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3 font-medium text-gray-900 dark:text-white outline-none focus:border-indigo-500"
-                        />
-                        <button 
-                            onClick={() => askAI(aiChatInput)}
-                            disabled={!aiChatInput || loadingAI}
-                            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-gray-800 text-white p-3 rounded-xl font-bold transition-colors"
-                        >
-                            <ArrowUpCircle size={24} />
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* PASSWORD RESET MODAL */}
-        {showPasswordModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-                <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2rem] p-8 shadow-2xl animate-slide-up border border-gray-100 dark:border-gray-800">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2"><KeyRound size={22} className="text-indigo-600"/> Security</h3>
-                        <button onClick={() => { setShowPasswordModal(false); setPassMsg(null); }} className="bg-gray-100 dark:bg-gray-800 p-2 rounded-full text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"><X size={20}/></button>
-                    </div>
-                    
-                    <div className="space-y-5">
-                        <div>
-                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1.5 ml-1">New Password</label>
-                             <input 
-                                type="password"
-                                placeholder="Min. 6 characters"
-                                value={newPassword}
-                                onChange={e => setNewPassword(e.target.value)}
-                                className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 font-bold text-gray-900 dark:text-white outline-none focus:border-indigo-500 transition-colors"
-                             />
-                        </div>
-                        
-                        {passMsg && (
-                             <div className={`p-3 rounded-xl text-sm font-bold flex items-start gap-2 ${passMsg.type === 'success' ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'}`}>
-                                 {passMsg.type === 'success' ? <CheckCircle2 size={18} className="mt-0.5"/> : <AlertCircle size={18} className="mt-0.5"/>}
-                                 {passMsg.text}
-                             </div>
-                        )}
-
-                        <button 
-                            onClick={changePassword} 
-                            disabled={!newPassword || newPassword.length < 6}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-gray-800 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none mt-4 transition-transform active:scale-95 text-sm uppercase tracking-wider"
-                        >
-                            Update Password
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {showAddModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-                <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2rem] p-8 shadow-2xl animate-slide-up border border-gray-100 dark:border-gray-800">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">Add {transType === TransactionType.EXPENSE ? 'Expense' : 'Income'}</h3>
-                        <button onClick={() => setShowAddModal(false)} className="bg-gray-100 dark:bg-gray-800 p-2 rounded-full text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"><X size={20}/></button>
-                    </div>
-                    
-                    <div className="space-y-5">
-                        <div>
-                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1.5 ml-1">Title</label>
-                             <input 
-                                placeholder="e.g. Grocery Shopping"
-                                value={title}
-                                onChange={e => setTitle(e.target.value)}
-                                className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 font-bold text-gray-900 dark:text-white outline-none focus:border-indigo-500 transition-colors"
-                             />
-                        </div>
-                        <div>
-                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1.5 ml-1">Amount</label>
-                             <input 
-                                type="number"
-                                placeholder="0.00"
-                                value={amount}
-                                onChange={e => setAmount(e.target.value)}
-                                className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 font-bold text-gray-900 dark:text-white outline-none focus:border-indigo-500 transition-colors"
-                             />
-                        </div>
-                        {transType === TransactionType.EXPENSE && (
-                             <div>
-                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1.5 ml-1">Category (Optional)</label>
-                                <select 
-                                    value={category} 
-                                    onChange={e => setCategory(e.target.value)}
-                                    className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 font-bold text-gray-900 dark:text-white outline-none focus:border-indigo-500 transition-colors"
-                                >
-                                    <option value="">Auto-Detect with AI</option>
-                                    {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                             </div>
-                        )}
-
-                        <button onClick={addTransaction} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none mt-4 transition-transform active:scale-95 text-sm uppercase tracking-wider">
-                            Save Transaction
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
     </div>
   );
+};
+
+// Extracted Content Component for Cleaner Main App
+const DashboardContent = ({ view, user, transactions, balance, income, expense, onAddTx, onDeleteTx }: any) => {
+    const [title, setTitle] = useState('');
+    const [amount, setAmount] = useState('');
+    const [loadingCat, setLoadingCat] = useState(false);
+    
+    // Filter transactions
+    const displayTxs = view === ViewState.HOME 
+        ? transactions.slice(0, 5) 
+        : transactions.filter((t: Transaction) => t.type === (view === ViewState.INCOME ? TransactionType.INCOME : TransactionType.EXPENSE));
+
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if(!title || !amount) return;
+        setLoadingCat(true);
+        const type = view === ViewState.INCOME ? TransactionType.INCOME : TransactionType.EXPENSE;
+        await onAddTx(title, parseFloat(amount), type);
+        setTitle('');
+        setAmount('');
+        setLoadingCat(false);
+    };
+
+    return (
+        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in">
+             {view === ViewState.HOME && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <StatCard title="Total Balance" amount={balance} type="neutral" currency={user.currency} privacyMode={user.privacyMode} />
+                    <StatCard title="Total Income" amount={income} type="success" currency={user.currency} privacyMode={user.privacyMode} />
+                    <StatCard title="Total Expenses" amount={expense} type="danger" currency={user.currency} privacyMode={user.privacyMode} />
+                </div>
+             )}
+
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                 <div className="lg:col-span-2 space-y-6">
+                     {(view === ViewState.EXPENSES || view === ViewState.INCOME) && (
+                        <div className="bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800">
+                             <h3 className="text-lg font-extrabold mb-4 px-2">Add {view === ViewState.INCOME ? 'Income' : 'Expense'}</h3>
+                             <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-4">
+                                <input 
+                                    value={title} onChange={e=>setTitle(e.target.value)}
+                                    placeholder="Description (e.g. Salary, Rent)" 
+                                    className="flex-1 bg-gray-50 dark:bg-gray-800 p-4 rounded-xl font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                />
+                                <div className="relative w-full md:w-40">
+                                     <span className="absolute left-4 top-4 text-gray-500 font-bold">{CURRENCY_SYMBOLS[user.currency as CurrencyCode]}</span>
+                                     <input 
+                                        type="number"
+                                        value={amount} onChange={e=>setAmount(e.target.value)}
+                                        placeholder="0.00" 
+                                        className="w-full bg-gray-50 dark:bg-gray-800 p-4 pl-10 rounded-xl font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                    />
+                                </div>
+                                <button disabled={loadingCat} type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-xl font-bold shadow-lg shadow-indigo-200 dark:shadow-none transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center min-w-[60px]">
+                                    {loadingCat ? <Loader2 className="animate-spin" /> : <Plus />}
+                                </button>
+                             </form>
+                        </div>
+                     )}
+
+                     <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-8 shadow-sm border border-gray-100 dark:border-gray-800 min-h-[400px]">
+                        <h3 className="text-xl font-extrabold mb-6 flex items-center gap-2">
+                             {view === ViewState.HOME ? <><TrendingUp className="text-indigo-600"/> Recent Activity</> : (view === ViewState.INCOME ? 'Income Records' : 'Expense Records')}
+                        </h3>
+                        
+                        <div className="space-y-4">
+                            {displayTxs.length === 0 ? (
+                                <div className="text-center py-20 opacity-50 font-medium">No transactions found. Start adding some!</div>
+                            ) : (
+                                displayTxs.map((t: Transaction) => (
+                                    <div key={t.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl group transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${t.type === TransactionType.INCOME ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+                                                {t.type === TransactionType.INCOME ? <ArrowUpCircle size={20}/> : <ArrowDownCircle size={20}/>}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-900 dark:text-white text-base">{t.title}</p>
+                                                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">{t.category} • {new Date(t.date).toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <span className={`font-extrabold text-lg ${t.type === TransactionType.INCOME ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-900 dark:text-white'}`}>
+                                                {t.type === TransactionType.INCOME ? '+' : '-'}
+                                                {formatCurrency(t.amount, user.currency, user.privacyMode)}
+                                            </span>
+                                            <button onClick={() => onDeleteTx(t.id)} className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                                                <Trash2 size={18}/>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                     </div>
+                 </div>
+
+                 {/* Widgets */}
+                 <div className="space-y-6">
+                    {view === ViewState.HOME && (
+                        <div className="bg-gradient-to-br from-indigo-900 to-slate-900 p-8 rounded-[2.5rem] text-white relative overflow-hidden shadow-xl">
+                            <Bot className="mb-4 text-indigo-300" size={32}/>
+                            <h3 className="text-2xl font-bold mb-2">Money Brain</h3>
+                            <p className="text-indigo-200 mb-6 leading-relaxed">
+                                {balance > 0 ? "You're in the green! Keep it up." : "Spending is high. Review your expenses."}
+                            </p>
+                            <div className="h-1 w-20 bg-indigo-500 rounded-full mb-6"></div>
+                            <div className="opacity-50 text-xs uppercase tracking-widest font-bold">AI Status: Active</div>
+                        </div>
+                    )}
+                 </div>
+             </div>
+        </div>
+    );
 };
 
 export default App;
