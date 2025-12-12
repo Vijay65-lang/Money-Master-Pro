@@ -147,6 +147,7 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [currency, setCurrency] = useState<CurrencyCode>('USD');
+    const [showPassword, setShowPassword] = useState(false);
     
     // Status
     const [error, setError] = useState('');
@@ -312,13 +313,20 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
                                     <div className="relative">
                                         <Lock className="absolute left-3.5 top-4 text-gray-400" size={20}/>
                                         <input 
-                                            type="password"
-                                            className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 pl-11 text-gray-900 dark:text-white font-bold outline-none focus:border-indigo-500 disabled:opacity-50 transition-colors"
+                                            type={showPassword ? "text" : "password"}
+                                            className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 pl-11 pr-12 text-gray-900 dark:text-white font-bold outline-none focus:border-indigo-500 disabled:opacity-50 transition-colors"
                                             value={password} onChange={e => setPassword(e.target.value)}
                                             required
                                             placeholder="••••••••"
                                             disabled={loading}
                                         />
+                                        <button 
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-4 top-4 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 focus:outline-none"
+                                        >
+                                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -928,7 +936,7 @@ const App = () => {
                          </button>
                     </div>
 
-                    {/* New Change Password Button */}
+                    {/* Change Password Button */}
                     <button 
                         onClick={() => { setShowPasswordModal(true); setPassMsg(null); }}
                         className="w-full p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-between group"
@@ -938,6 +946,17 @@ const App = () => {
                             <span className="font-bold text-gray-900 dark:text-white">Change Password</span>
                          </div>
                          <ChevronRight size={20} className="text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"/>
+                    </button>
+
+                    {/* NEW SIGN OUT BUTTON */}
+                    <button 
+                        onClick={handleLogout}
+                        className="w-full p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors flex items-center justify-between group mt-4 border border-red-100 dark:border-red-900/20"
+                    >
+                         <div className="flex items-center gap-4">
+                            <div className="p-2.5 bg-white dark:bg-red-900/30 rounded-xl shadow-sm group-hover:scale-110 transition-transform"><LogOut size={20} className="text-red-600 dark:text-red-400"/></div>
+                            <span className="font-bold text-red-700 dark:text-red-400">Sign Out</span>
+                         </div>
                     </button>
                 </div>
             </div>
@@ -968,10 +987,10 @@ const App = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-gray-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+    <div className="flex h-[100dvh] bg-slate-50 dark:bg-gray-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300 overflow-hidden">
         <Sidebar view={view} setView={setView} handleLogout={handleLogout} user={user} />
         
-        <main className="flex-1 overflow-auto relative flex flex-col">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden relative flex flex-col scroll-smooth">
             <header className="md:hidden flex items-center justify-between p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20">
                 <div className="flex items-center gap-2 font-extrabold text-lg text-gray-900 dark:text-white">
                     <div className="bg-indigo-600 text-white p-1.5 rounded-lg"><Wallet size={18} /></div> MMP
@@ -986,7 +1005,7 @@ const App = () => {
                 </div>
             </header>
 
-            <div className="flex-1 p-4 md:p-10 flex flex-col max-w-[1600px] mx-auto w-full">
+            <div className="flex-1 p-4 md:p-10 flex flex-col max-w-[1600px] mx-auto w-full pb-24 md:pb-10">
                 {view === ViewState.HOME && renderHome()}
                 {view === ViewState.EXPENSES && renderManager(TransactionType.EXPENSE)}
                 {view === ViewState.INCOME && renderManager(TransactionType.INCOME)}

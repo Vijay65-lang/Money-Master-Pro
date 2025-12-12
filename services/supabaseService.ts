@@ -25,7 +25,7 @@ const isConfigured = () => {
 };
 
 // Initialize Supabase client
-export const supabase = createClient(cleanUrl, cleanKey);
+export const supabase = createClient(cleanUrl, cleanKey) as any;
 
 // Helper to log actionable errors
 const handleDbError = (context: string, error: any) => {
@@ -129,7 +129,7 @@ export const sbSignup = async (
 export const sbResetPassword = async (email: string): Promise<{ success: boolean; error: string | null }> => {
     if (!isConfigured()) return { success: false, error: "Database keys invalid." };
     
-    // Explicitly grab the origin (e.g., https://myapp.netlify.app)
+    // Explicitly grab the origin (e.g., https://your-app.vercel.app)
     // NOTE: This URL MUST be added to "Redirect URLs" in Supabase Dashboard -> Auth -> URL Configuration
     const redirectUrl = window.location.origin;
 
