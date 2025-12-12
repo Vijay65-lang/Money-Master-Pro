@@ -449,9 +449,11 @@ const App = () => {
         setPassMsg({ type: 'success', text: 'Recovery verified. Set your new password now.' });
         isRecoveryMode.current = false;
         window.history.replaceState(null, '', window.location.pathname);
-    } else {
-        setView(ViewState.HOME);
-    }
+    } 
+    
+    // ALWAYS enter the app (ViewState.HOME) regardless of recovery mode
+    // This fixes the bug where recovery users were stuck on Auth screen
+    setView(ViewState.HOME);
   };
   
   const handleLogout = async () => {
