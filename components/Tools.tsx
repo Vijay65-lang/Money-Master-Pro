@@ -9,8 +9,7 @@ import {
 import { CurrencyCode, CURRENCY_SYMBOLS } from '../types';
 import { sbSaveToolData } from '../services/supabaseService';
 import { 
-  PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip, 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, BarChart, Bar 
+  PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip 
 } from 'recharts';
 
 interface ToolsProps {
@@ -77,6 +76,11 @@ const ResultCard = ({ title, amount, subtitle, color, symbol, privacyMode, fullW
         orange: 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
         indigo: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
         teal: 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800',
+        cyan: 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
+        slate: 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+        amber: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+        rose: 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+        pink: 'bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800',
     };
 
     return (
@@ -89,7 +93,7 @@ const ResultCard = ({ title, amount, subtitle, color, symbol, privacyMode, fullW
 };
 
 const DonutChart = ({ data, totalLabel, totalValue }: any) => (
-    <div className="h-48 relative my-4">
+    <div className="h-48 w-full min-w-[200px] relative my-4">
         <ResponsiveContainer width="100%" height="100%">
             <RePieChart>
                 <Pie data={data} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">
@@ -114,7 +118,6 @@ const CurrencyConverter = ({ userId, privacyMode }: any) => {
     const [from, setFrom] = usePersist(userId, 'curr', 'f', 'USD');
     const [to, setTo] = usePersist(userId, 'curr', 't', 'INR');
     
-    // Auto calculate rate based on base USD
     const rate = useMemo(() => (EXCHANGE_RATES[to] / EXCHANGE_RATES[from]), [from, to]);
     const converted = amount * rate;
 
@@ -148,20 +151,19 @@ const CurrencyConverter = ({ userId, privacyMode }: any) => {
 
 const SalaryCalc = ({ symbol, userId }: any) => {
     const [amount, setAmount] = usePersist(userId, 'sal', 'a', 50000);
-    const [period, setPeriod] = usePersist(userId, 'sal', 'p', 'year'); // year, month, hour
+    const [period, setPeriod] = usePersist(userId, 'sal', 'p', 'year');
     
-    // Normalize to annual
     let annual = amount;
     if (period === 'month') annual = amount * 12;
     if (period === 'week') annual = amount * 52;
-    if (period === 'hour') annual = amount * 40 * 52; // Assuming 40h week
+    if (period === 'hour') annual = amount * 40 * 52;
 
     const breakdown = [
         { label: 'Yearly', val: annual },
         { label: 'Monthly', val: annual / 12 },
         { label: 'Bi-Weekly', val: annual / 26 },
         { label: 'Weekly', val: annual / 52 },
-        { label: 'Daily', val: annual / 260 }, // 5 days/week
+        { label: 'Daily', val: annual / 260 },
         { label: 'Hourly', val: annual / 2080 },
     ];
 
@@ -193,7 +195,7 @@ const SalaryCalc = ({ symbol, userId }: any) => {
     );
 };
 
-// --- 2. INVESTMENT TOOLS (Visualized) ---
+// --- 2. INVESTMENT TOOLS ---
 
 const SIPCalc = ({ symbol, userId }: any) => {
     const [invest, setInvest] = usePersist(userId, 'sip', 'i', 5000);
@@ -271,11 +273,9 @@ const LoanElig = ({ symbol, userId }: any) => {
     const [tenure, setTenure] = usePersist(userId, 'le', 't', 20);
     const [existingEMI, setExistingEMI] = usePersist(userId, 'le', 'e', 0);
 
-    // Logic: Banks typically consider 50% of net income as available for EMI
     const maxEMI = (income * 0.50) - existingEMI;
     const r = rate / 1200;
     const n = tenure * 12;
-    // P = EMI * ((1+r)^n - 1) / (r * (1+r)^n)
     const maxLoan = maxEMI > 0 ? maxEMI * ((Math.pow(1 + r, n) - 1) / (r * Math.pow(1 + r, n))) : 0;
 
     return (
@@ -296,7 +296,6 @@ const LoanElig = ({ symbol, userId }: any) => {
 const BudgetMaker = ({ symbol, userId }: any) => {
     const [income, setIncome] = usePersist(userId, 'bud', 'i', 5000);
     
-    // 50/30/20 Rule
     const needs = income * 0.5;
     const wants = income * 0.3;
     const savings = income * 0.2;
@@ -310,7 +309,7 @@ const BudgetMaker = ({ symbol, userId }: any) => {
     return (
         <div className="space-y-6">
             <InputGroup label="Monthly Income" value={income} onChange={setIncome} symbol={symbol} />
-            <div className="h-48">
+            <div className="h-48 w-full min-w-[200px]">
                 <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
                         <Pie data={data} cx="50%" cy="50%" outerRadius={70} dataKey="value">
@@ -385,7 +384,7 @@ const CryptoCalc = ({ symbol, userId }: any) => {
     const [buy, setBuy] = usePersist(userId, 'cry', 'b', 50000);
     const [sell, setSell] = usePersist(userId, 'cry', 's', 55000);
     const [amt, setAmt] = usePersist(userId, 'cry', 'a', 0.5);
-    const [fee, setFee] = usePersist(userId, 'cry', 'f', 0.1); // % fee
+    const [fee, setFee] = usePersist(userId, 'cry', 'f', 0.1);
 
     const cost = buy * amt;
     const revenue = sell * amt;
@@ -408,13 +407,11 @@ const CryptoCalc = ({ symbol, userId }: any) => {
     );
 };
 
-// ... Reusing simple ones with better layout ...
 const TaxEstimator = ({ symbol, userId }: any) => {
     const [inc, setInc] = usePersist(userId, 'tax', 'i', 60000);
-    // Simple progressive logic for demo (can be localized later)
     let tax = 0;
-    if (inc > 10000) tax += (Math.min(inc, 40000) - 10000) * 0.10; // 10% on 10k-40k
-    if (inc > 40000) tax += (inc - 40000) * 0.20; // 20% on >40k
+    if (inc > 10000) tax += (Math.min(inc, 40000) - 10000) * 0.10;
+    if (inc > 40000) tax += (inc - 40000) * 0.20;
     
     const monthly = (inc - tax) / 12;
 
@@ -433,9 +430,7 @@ const TaxEstimator = ({ symbol, userId }: any) => {
     );
 };
 
-// ... Standard Reusable Logic Wrapped in Components for other 20+ tools ...
-// (Consolidating smaller tools for code efficiency while keeping unique inputs)
-
+// Generic Calc Component
 const SimpleCalc = ({ inputs, formula, title, color, symbol, subtitleFn, userId, id }: any) => {
     const [vals, setVals] = usePersist(userId, id, 'v', inputs.map((i: any) => i.def));
     const res = formula(vals);
@@ -460,7 +455,7 @@ const SimpleCalc = ({ inputs, formula, title, color, symbol, subtitleFn, userId,
 };
 
 // --- TOOL REGISTRY & MAP ---
-// Defining all tools using the specialized or generic components
+// FIX: KEYS MUST MATCH ARRAY IDs EXACTLY TO PREVENT LOADING ERROR
 
 const TOOL_COMPONENTS: any = {
     // Specialized
@@ -480,27 +475,27 @@ const TOOL_COMPONENTS: any = {
         formula={([p, r, t]: any[]) => p * Math.pow(1 + r/100, t)} 
         subtitleFn={(res: number, [deposit]: number[]) => `Interest: ${props.symbol}${Math.round(res-deposit)}`} />,
         
-    rd: (p: any) => <SimpleCalc {...p} id="rd" title="Maturity Value" color="pink"
+    rd: (props: any) => <SimpleCalc {...props} id="rd" title="Maturity Value" color="pink"
         inputs={[{label: 'Monthly Deposit', def: 5000, symbol: true}, {label: 'Rate', def: 7, suffix: '%'}, {label: 'Years', def: 5, suffix: 'Yr'}]}
         formula={([m, r, t]: any[]) => { const i = r/1200; const n = t*12; return m * ((Math.pow(1+i, n)-1)/i)*(1+i); }} 
-        subtitleFn={(res: number, [m, r, t]: number[]) => `Invested: ${p.symbol}${m*t*12}`} />,
+        subtitleFn={(res: number, [m, r, t]: number[]) => `Invested: ${props.symbol}${m*t*12}`} />,
         
-    ppf: (p: any) => <SimpleCalc {...p} id="ppf" title="Maturity (15Y)" color="indigo"
+    ppf: (props: any) => <SimpleCalc {...props} id="ppf" title="Maturity (15Y)" color="indigo"
         inputs={[{label: 'Yearly Investment', def: 100000, symbol: true}]}
         formula={([y]: any[]) => { const r=7.1/100; return y*((Math.pow(1+r, 15)-1)/r)*(1+r); }}
-        subtitleFn={(res: number, [y]: number[]) => `Total Invested: ${p.symbol}${y*15}`} />,
+        subtitleFn={(res: number, [y]: number[]) => `Total Invested: ${props.symbol}${y*15}`} />,
         
-    cagr: (p: any) => <SimpleCalc {...p} id="cagr" title="CAGR %" color="purple"
+    cagr: (props: any) => <SimpleCalc {...props} id="cagr" title="CAGR %" color="purple"
         inputs={[{label: 'Start Value', def: 10000, symbol: true}, {label: 'End Value', def: 20000, symbol: true}, {label: 'Years', def: 5}]}
         formula={([s, e, y]: any[]) => (Math.pow(e/s, 1/y) - 1) * 100} 
         subtitleFn={() => 'Annual Growth Rate'} />,
         
-    roi: (p: any) => <SimpleCalc {...p} id="roi" title="ROI %" color="green"
+    roi: (props: any) => <SimpleCalc {...props} id="roi" title="ROI %" color="green"
         inputs={[{label: 'Invested', def: 50000, symbol: true}, {label: 'Returned', def: 65000, symbol: true}]}
         formula={([i, r]: any[]) => ((r-i)/i)*100}
-        subtitleFn={(res: number, [i, r]: number[]) => `Profit: ${p.symbol}${r-i}`} />,
+        subtitleFn={(res: number, [i, r]: number[]) => `Profit: ${props.symbol}${r-i}`} />,
         
-    rule72: (p: any) => <SimpleCalc {...p} id="r72" title="Years to Double" color="orange"
+    rule72: (props: any) => <SimpleCalc {...props} id="r72" title="Years to Double" color="orange"
         inputs={[{label: 'Interest Rate', def: 12, suffix: '%'}]}
         formula={([r]: any[]) => 72/r} subtitleFn={() => 'At compound interest'} />,
         
@@ -509,100 +504,100 @@ const TOOL_COMPONENTS: any = {
         formula={([p, r, t]: any[]) => p + (p*r*t)/100}
         subtitleFn={(res: number, [principal]: number[]) => `Interest: ${props.symbol}${res-principal}`} />,
         
-    fuel: (p: any) => <SimpleCalc {...p} id="fuel" title="Trip Cost" color="rose"
+    fuel: (props: any) => <SimpleCalc {...props} id="fuel" title="Trip Cost" color="rose"
         inputs={[{label: 'Distance (km)', def: 100}, {label: 'Mileage (km/l)', def: 15}, {label: 'Fuel Price', def: 100, symbol: true}]}
         formula={([d, m, p]: any[]) => (d/m)*p}
         subtitleFn={(res: number, [d, m]: number[]) => `Fuel Required: ${(d/m).toFixed(1)}L`} />,
         
-    vat: (p: any) => <SimpleCalc {...p} id="vat" title="Final Amount" color="cyan"
+    vat: (props: any) => <SimpleCalc {...props} id="vat" title="Final Amount" color="cyan"
         inputs={[{label: 'Price', def: 100, symbol: true}, {label: 'VAT %', def: 20}]}
         formula={([p, v]: any[]) => p * (1 + v/100)}
-        subtitleFn={(res: number, [pr]: number[]) => `Tax: ${p.symbol}${res-pr}`} />,
+        subtitleFn={(res: number, [pr]: number[]) => `Tax: ${props.symbol}${res-pr}`} />,
         
-    gst: (p: any) => <SimpleCalc {...p} id="gst" title="Final Amount" color="blue"
+    gst: (props: any) => <SimpleCalc {...props} id="gst" title="Final Amount" color="blue"
         inputs={[{label: 'Price', def: 1000, symbol: true}, {label: 'GST %', def: 18}]}
         formula={([p, g]: any[]) => p * (1 + g/100)}
-        subtitleFn={(res: number, [pr]: number[]) => `Tax: ${p.symbol}${res-pr}`} />,
+        subtitleFn={(res: number, [pr]: number[]) => `Tax: ${props.symbol}${res-pr}`} />,
         
-    discount: (p: any) => <SimpleCalc {...p} id="disc" title="Discounted Price" color="pink"
+    discount: (props: any) => <SimpleCalc {...props} id="disc" title="Discounted Price" color="pink"
         inputs={[{label: 'Original Price', def: 500, symbol: true}, {label: 'Discount %', def: 20}]}
         formula={([p, d]: any[]) => p * (1 - d/100)}
-        subtitleFn={(res: number, [pr]: number[]) => `You Save: ${p.symbol}${pr-res}`} />,
+        subtitleFn={(res: number, [pr]: number[]) => `You Save: ${props.symbol}${pr-res}`} />,
         
-    tip: (p: any) => <SimpleCalc {...p} id="tip" title="Total Bill" color="teal"
+    tip: (props: any) => <SimpleCalc {...props} id="tip" title="Total Bill" color="teal"
         inputs={[{label: 'Bill Amount', def: 50, symbol: true}, {label: 'Tip %', def: 15}]}
         formula={([b, t]: any[]) => b * (1 + t/100)}
-        subtitleFn={(res: number, [b]: number[]) => `Tip: ${p.symbol}${res-b}`} />,
+        subtitleFn={(res: number, [b]: number[]) => `Tip: ${props.symbol}${res-b}`} />,
         
-    inflation: (p: any) => <SimpleCalc {...p} id="inf" title="Future Cost" color="orange"
+    inflation: (props: any) => <SimpleCalc {...props} id="inf" title="Future Cost" color="orange"
         inputs={[{label: 'Current Cost', def: 1000, symbol: true}, {label: 'Inflation %', def: 6}, {label: 'Years', def: 10}]}
         formula={([c, r, y]: any[]) => c * Math.pow(1 + r/100, y)}
         subtitleFn={(res: number) => 'Effect of purchasing power loss'} />,
         
-    fire: (p: any) => <SimpleCalc {...p} id="fire" title="FIRE Number" color="red"
+    fire: (props: any) => <SimpleCalc {...props} id="fire" title="FIRE Number" color="red"
         inputs={[{label: 'Annual Expense', def: 40000, symbol: true}]}
         formula={([e]: any[]) => e * 25}
         subtitleFn={() => 'Corpus for financial independence'} />,
         
-    retirement: (p: any) => <SimpleCalc {...p} id="ret" title="Corpus Needed" color="indigo"
+    retirement: (props: any) => <SimpleCalc {...props} id="ret" title="Corpus Needed" color="indigo"
         inputs={[{label: 'Monthly Exp', def: 3000, symbol: true}, {label: 'Current Age', def: 30}, {label: 'Retire Age', def: 60}]}
         formula={([e, ca, ra]: any[]) => { const y = ra-ca; const fv = e * Math.pow(1.06, y); return fv * 12 * 20; }}
         subtitleFn={(res: number, [e, ca, ra]: number[]) => `For 20 years post-retirement`} />,
         
-    emergency: (p: any) => <SimpleCalc {...p} id="eme" title="Emergency Fund" color="red"
+    emergency: (props: any) => <SimpleCalc {...props} id="eme" title="Emergency Fund" color="red"
         inputs={[{label: 'Monthly Exp', def: 3000, symbol: true}, {label: 'Months', def: 6}]}
         formula={([e, m]: any[]) => e * m}
         subtitleFn={() => 'Keep in liquid assets'} />,
         
-    goal: (p: any) => <SimpleCalc {...p} id="goal" title="Monthly Saving" color="green"
+    goal: (props: any) => <SimpleCalc {...props} id="goal" title="Monthly Saving" color="green"
         inputs={[{label: 'Target Amount', def: 100000, symbol: true}, {label: 'Years', def: 5}, {label: 'Return %', def: 10}]}
         formula={([g, y, r]: any[]) => { const i = r/1200; const n = y*12; return g / (((Math.pow(1+i,n)-1)/i)*(1+i)); }}
         subtitleFn={() => 'To reach goal on time'} />,
         
-    networth: (p: any) => <SimpleCalc {...p} id="nw" title="Net Worth" color="indigo"
+    networth: (props: any) => <SimpleCalc {...props} id="nw" title="Net Worth" color="indigo"
         inputs={[{label: 'Total Assets', def: 500000, symbol: true}, {label: 'Total Liabilities', def: 200000, symbol: true}]}
         formula={([a, l]: any[]) => a - l}
         subtitleFn={(res: number) => res > 0 ? 'Positive Equity' : 'In Debt'} />,
         
-    rental: (p: any) => <SimpleCalc {...p} id="rent" title="Rental Yield" color="orange"
+    rental: (props: any) => <SimpleCalc {...props} id="rent" title="Rental Yield" color="orange"
         inputs={[{label: 'Property Cost', def: 200000, symbol: true}, {label: 'Monthly Rent', def: 1500, symbol: true}]}
         formula={([c, r]: any[]) => ((r*12)/c)*100}
         subtitleFn={() => 'Gross Annual Yield %'} />,
         
-    dividend: (p: any) => <SimpleCalc {...p} id="div" title="Dividend Yield" color="green"
+    dividend: (props: any) => <SimpleCalc {...props} id="div" title="Dividend Yield" color="green"
         inputs={[{label: 'Share Price', def: 100, symbol: true}, {label: 'Annual Div', def: 5, symbol: true}]}
         formula={([p, d]: any[]) => (d/p)*100}
         subtitleFn={() => 'Return on stock price'} />,
         
-    caprate: (p: any) => <SimpleCalc {...p} id="cap" title="Cap Rate" color="purple"
+    caprate: (props: any) => <SimpleCalc {...props} id="cap" title="Cap Rate" color="purple"
         inputs={[{label: 'Net Op Income', def: 30000, symbol: true}, {label: 'Property Value', def: 500000, symbol: true}]}
         formula={([n, v]: any[]) => (n/v)*100}
         subtitleFn={() => 'Capitalization Rate %'} />,
         
-    debt_pay: (p: any) => <SimpleCalc {...p} id="debt" title="Months to Payoff" color="rose"
+    debt_pay: (props: any) => <SimpleCalc {...props} id="debt" title="Months to Payoff" color="rose"
         inputs={[{label: 'Balance', def: 5000, symbol: true}, {label: 'Rate %', def: 18}, {label: 'Monthly Pay', def: 200, symbol: true}]}
         formula={([b, r, m]: any[]) => { const i=r/1200; return m<=b*i ? 0 : (-Math.log(1-(i*b)/m)/Math.log(1+i)); }}
         subtitleFn={(res: number) => res===0 ? 'Increase Payment!' : `${(res/12).toFixed(1)} Years`} />,
         
-    breakeven: (p: any) => <SimpleCalc {...p} id="be" title="Break Even Units" color="slate"
+    breakeven: (props: any) => <SimpleCalc {...props} id="be" title="Break Even Units" color="slate"
         inputs={[{label: 'Fixed Cost', def: 1000, symbol: true}, {label: 'Price/Unit', def: 50, symbol: true}, {label: 'Var Cost/Unit', def: 20, symbol: true}]}
         formula={([f, p, v]: any[]) => f / (p-v)}
         subtitleFn={() => 'Units to sell to cover costs'} />,
         
-    margin: (p: any) => <SimpleCalc {...p} id="marg" title="Gross Margin %" color="blue"
+    margin: (props: any) => <SimpleCalc {...props} id="marg" title="Gross Margin %" color="blue"
         inputs={[{label: 'Cost', def: 50, symbol: true}, {label: 'Revenue', def: 100, symbol: true}]}
         formula={([c, r]: any[]) => ((r-c)/r)*100}
         subtitleFn={() => 'Profitability Ratio'} />,
         
-    mortgage: (p: any) => <SimpleCalc {...p} id="mort" title="Monthly Payment" color="amber"
+    mortgage: (props: any) => <SimpleCalc {...props} id="mort" title="Monthly Payment" color="amber"
         inputs={[{label: 'Loan', def: 300000, symbol: true}, {label: 'Rate', def: 6.5, suffix: '%'}, {label: 'Years', def: 30}]}
         formula={([l, r, y]: any[]) => { const i=r/1200; const n=y*12; return (l*i*Math.pow(1+i,n))/(Math.pow(1+i,n)-1); }}
-        subtitleFn={(res: number, [l, r, y]: number[]) => `Total: ${p.symbol}${Math.round(res*y*12)}`} />,
+        subtitleFn={(res: number, [l, r, y]: number[]) => `Total: ${props.symbol}${Math.round(res*y*12)}`} />,
         
-    cd: (p: any) => <SimpleCalc {...p} id="cd" title="Maturity Value" color="cyan"
+    cd: (props: any) => <SimpleCalc {...props} id="cd" title="Maturity Value" color="cyan"
         inputs={[{label: 'Deposit', def: 10000, symbol: true}, {label: 'APY', def: 5, suffix: '%'}, {label: 'Years', def: 3}]}
         formula={([d, r, y]: any[]) => d * Math.pow(1+r/100, y)}
-        subtitleFn={(res: number, [d]: number[]) => `Profit: ${p.symbol}${Math.round(res-d)}`} />,
+        subtitleFn={(res: number, [d]: number[]) => `Profit: ${props.symbol}${Math.round(res-d)}`} />,
 };
 
 // --- MAIN COMPONENT ---
@@ -611,6 +606,7 @@ export const Tools: React.FC<ToolsProps> = ({ currency, userId, privacyMode }) =
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const symbol = CURRENCY_SYMBOLS[currency];
 
+  // IDs here MUST match keys in TOOL_COMPONENTS above
   const tools = [
     // Investments
     { id: 'sip', name: 'SIP Wealth', icon: TrendingUp, color: 'emerald', desc: 'Systematic Investment Plan calculator with visualization' },
@@ -659,7 +655,6 @@ export const Tools: React.FC<ToolsProps> = ({ currency, userId, privacyMode }) =
   ];
 
   const getColor = (c: string) => {
-     // Simplified color mapping for grid items
      return `bg-${c}-100 text-${c}-600 dark:bg-${c}-900/40 dark:text-${c}-300`;
   };
 
@@ -685,10 +680,10 @@ export const Tools: React.FC<ToolsProps> = ({ currency, userId, privacyMode }) =
            </div>
            
            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10">
-                {/* Render the specific tool component */}
+                {/* Safe render check */}
                 {TOOL_COMPONENTS[activeTool] 
                     ? React.createElement(TOOL_COMPONENTS[activeTool], { symbol, userId, privacyMode })
-                    : <p>Tool loading...</p>
+                    : <div className="text-center text-gray-500 p-10">Tool component not found. Please contact support.</div>
                 }
            </div>
         </div>
