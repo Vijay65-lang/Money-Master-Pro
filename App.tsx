@@ -396,6 +396,130 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
     );
 };
 
+// --- RESET PASSWORD SCREEN (LANDING PAGE) ---
+const ResetPasswordScreen = ({ onComplete, user }: { onComplete: () => void, user: UserProfile | null }) => {
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+    const [msg, setMsg] = useState('');
+    const [showPass, setShowPass] = useState(false);
+    
+    // We display the user's email if available, or allow them to type it if for some reason context is lost but session is active
+    const [emailDisplay, setEmailDisplay] = useState(user?.email || '');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if(newPassword.length < 6) {
+            setStatus('error');
+            setMsg('Password must be at least 6 characters.');
+            return;
+        }
+        if(newPassword !== confirmPassword) {
+            setStatus('error');
+            setMsg('Passwords do not match.');
+            return;
+        }
+
+        setStatus('loading');
+        setMsg('');
+
+        const { error } = await sbUpdateUserPassword(newPassword);
+
+        if(error) {
+            setStatus('error');
+            setMsg(error);
+        } else {
+            setStatus('success');
+            setMsg('Password updated successfully! Redirecting...');
+            setTimeout(onComplete, 2000);
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-slate-50 dark:bg-gray-950 flex items-center justify-center p-4">
+             <div className="bg-white dark:bg-gray-900 w-full max-w-md p-8 rounded-[2rem] shadow-2xl border border-gray-100 dark:border-gray-800 animate-slide-up relative overflow-hidden">
+                <div className="flex justify-center mb-6">
+                    <div className="bg-gradient-to-tr from-indigo-600 to-violet-600 p-4 rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-none text-white">
+                        <Wallet size={32} />
+                    </div>
+                </div>
+                <h2 className="text-2xl font-extrabold text-center mb-2 text-gray-900 dark:text-white">Money Master Pro</h2>
+                <p className="text-center text-gray-500 mb-8 text-sm font-medium">
+                   Securely update your password.
+                </p>
+
+                {status === 'success' ? (
+                     <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-2xl text-center animate-fade-in">
+                         <div className="w-12 h-12 bg-green-100 dark:bg-green-800 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600 dark:text-green-300">
+                             <CheckCircle2 size={24} />
+                         </div>
+                         <p className="text-green-700 dark:text-green-300 font-bold">{msg}</p>
+                     </div>
+                ) : (
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Email Field - Primarily for verification visual */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1.5 uppercase ml-1">Email Address</label>
+                            <div className="relative">
+                                <Mail className="absolute left-3.5 top-4 text-gray-400" size={20}/>
+                                <input 
+                                    type="email"
+                                    className="w-full bg-gray-100 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 pl-11 text-gray-500 dark:text-gray-400 font-bold outline-none cursor-not-allowed"
+                                    value={emailDisplay} 
+                                    readOnly
+                                    placeholder="Your Email"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1.5 uppercase ml-1">New Password</label>
+                            <div className="relative">
+                                <Lock className="absolute left-3.5 top-4 text-gray-400" size={20}/>
+                                <input 
+                                    type={showPass ? "text" : "password"}
+                                    className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 pl-11 pr-12 text-gray-900 dark:text-white font-bold outline-none focus:border-indigo-500 transition-colors"
+                                    value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                                    required
+                                    placeholder="••••••••"
+                                    disabled={status === 'loading'}
+                                />
+                                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-4 text-gray-400 hover:text-indigo-600">
+                                    {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-900 dark:text-white mb-1.5 uppercase ml-1">Confirm Password</label>
+                            <div className="relative">
+                                <Lock className="absolute left-3.5 top-4 text-gray-400" size={20}/>
+                                <input 
+                                    type="password"
+                                    className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-3.5 pl-11 text-gray-900 dark:text-white font-bold outline-none focus:border-indigo-500 transition-colors"
+                                    value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                                    required
+                                    placeholder="••••••••"
+                                    disabled={status === 'loading'}
+                                />
+                            </div>
+                        </div>
+
+                        {status === 'error' && (
+                             <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 text-sm font-bold rounded-xl flex items-center gap-2">
+                                <AlertCircle size={18} /> {msg}
+                             </div>
+                        )}
+
+                        <button disabled={status === 'loading'} type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none mt-2 flex items-center justify-center gap-2 disabled:opacity-70 transition-transform active:scale-95 text-sm uppercase tracking-wider">
+                             {status === 'loading' ? 'Updating...' : 'Update Password'}
+                        </button>
+                    </form>
+                )}
+             </div>
+        </div>
+    );
+};
+
 // --- APP COMPONENT ---
 
 const App = () => {
@@ -425,8 +549,11 @@ const App = () => {
   // Inactivity Timer
   const lastActivity = useRef(Date.now());
   
-  // ⚡️ RACE CONDITION FIX
-  const isRecoveryMode = useRef(window.location.hash.includes('type=recovery'));
+  // ⚡️ RACE CONDITION FIX & MANUAL TEST SUPPORT
+  const isRecoveryMode = useRef(
+    window.location.hash.includes('type=recovery') || 
+    window.location.hash === '#reset-password'
+  );
 
   const handleLogin = async (loggedInUser: UserProfile) => {
     setUser(loggedInUser);
@@ -443,17 +570,14 @@ const App = () => {
         setTransactions(cloudTx);
     }
     
-    // ⚡️ IF this was a recovery link, force the Password Modal open immediately
+    // ⚡️ IF this was a recovery link, Force Reset Password View
     if (isRecoveryMode.current) {
-        setShowPasswordModal(true);
-        setPassMsg({ type: 'success', text: 'Recovery verified. Set your new password now.' });
+        setView(ViewState.RESET_PASSWORD);
         isRecoveryMode.current = false;
         window.history.replaceState(null, '', window.location.pathname);
-    } 
-    
-    // ALWAYS enter the app (ViewState.HOME) regardless of recovery mode
-    // This fixes the bug where recovery users were stuck on Auth screen
-    setView(ViewState.HOME);
+    } else {
+        setView(ViewState.HOME);
+    }
   };
   
   const handleLogout = async () => {
@@ -471,6 +595,12 @@ const App = () => {
   // --- SESSION CHECKER ---
   useEffect(() => {
     let mounted = true;
+
+    // Direct Access Check for UI testing or Manual Navigation
+    if (window.location.hash === '#reset-password') {
+        setView(ViewState.RESET_PASSWORD);
+        isRecoveryMode.current = true;
+    }
 
     const initAuth = async () => {
         const { data: { session } } = await supabase.auth.getSession();
@@ -498,12 +628,14 @@ const App = () => {
         }
         if (event === 'PASSWORD_RECOVERY') {
             isRecoveryMode.current = true;
-            setShowPasswordModal(true); // Ensure modal pops up
-            setPassMsg({ type: 'success', text: 'Recovery successful. Please set a new password.' });
+            setView(ViewState.RESET_PASSWORD); // ⚡️ DIRECTLY SWITCH TO RESET VIEW
         }
         if (event === 'SIGNED_OUT' && mounted) {
             setUser(null);
-            setView(ViewState.AUTH);
+            // ⚡️ CRITICAL FIX: Do NOT switch to AUTH if we are in recovery mode.
+            if (!isRecoveryMode.current) {
+                setView(ViewState.AUTH);
+            }
         }
     });
 
@@ -632,30 +764,55 @@ const App = () => {
 
   // --- RENDERERS ---
 
+  if (view === ViewState.RESET_PASSWORD) {
+      return <ResetPasswordScreen onComplete={() => setView(ViewState.HOME)} user={user} />;
+  }
+
   const renderHome = () => {
       const chartData = [
           { name: 'Income', value: income, fill: '#10b981' },
           { name: 'Expenses', value: expense, fill: '#ef4444' }
       ];
 
+      // EXPENSE PIE DATA FOR DASHBOARD
+      const expenses = transactions.filter(t => t.type === TransactionType.EXPENSE);
+      const expenseTotals: Record<string, number> = {};
+      expenses.forEach(t => { expenseTotals[t.category] = (expenseTotals[t.category] || 0) + t.amount; });
+      const pieData = Object.keys(expenseTotals).map(cat => ({ name: cat, value: expenseTotals[cat] })).sort((a,b) => b.value - a.value).slice(0, 5);
+      const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'];
+
       return (
-        <div className="space-y-8 animate-fade-in max-w-7xl mx-auto w-full">
+        <div className="space-y-6 md:space-y-8 animate-fade-in max-w-7xl mx-auto w-full">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Daily Overview</h2>
                     <p className="text-gray-500 text-sm font-medium flex items-center gap-2 mt-1">
                         <span className="text-emerald-500 font-bold flex items-center gap-1"><Cloud size={12}/> {user?.cloudConnected ? 'Cloud Sync Active' : 'Offline Mode'}</span>
-                        Here's what's happening today.
                     </p>
                 </div>
                 <div className="flex gap-3">
                     <button onClick={togglePrivacy} className="bg-white dark:bg-gray-800 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
                         {privacyMode ? <EyeOff size={20}/> : <Eye size={20}/>}
                     </button>
-                    <button onClick={() => { setTransType(TransactionType.EXPENSE); setShowAddModal(true); }} className="bg-gray-900 dark:bg-white text-white dark:text-black px-6 py-3.5 rounded-2xl font-bold shadow-lg shadow-gray-200 dark:shadow-none flex items-center gap-2 hover:-translate-y-1 transition-transform">
-                        <Plus size={20} /> Add New
-                    </button>
                 </div>
+            </div>
+
+            {/* MOBILE QUICK ACTIONS (LARGE BUTTONS) */}
+            <div className="grid grid-cols-2 gap-4 md:hidden">
+                <button 
+                    onClick={() => { setTransType(TransactionType.EXPENSE); setShowAddModal(true); }} 
+                    className="flex flex-col items-center justify-center gap-2 p-5 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform"
+                >
+                    <div className="bg-white dark:bg-rose-900/50 p-2 rounded-full"><Plus size={24}/></div>
+                    <span>Add Expense</span>
+                </button>
+                <button 
+                    onClick={() => { setTransType(TransactionType.INCOME); setShowAddModal(true); }} 
+                    className="flex flex-col items-center justify-center gap-2 p-5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform"
+                >
+                    <div className="bg-white dark:bg-emerald-900/50 p-2 rounded-full"><Plus size={24}/></div>
+                    <span>Add Income</span>
+                </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -664,7 +821,11 @@ const App = () => {
                 <StatCard title="Monthly Expenses" amount={Number(expense)} type="danger" currency={user!.currency} privacyMode={privacyMode} />
             </div>
             
-            <AdBanner text="Sponsored: High Yield Savings Accounts" cta="OPEN" />
+            <div className="hidden md:flex justify-end">
+                 <button onClick={() => { setTransType(TransactionType.EXPENSE); setShowAddModal(true); }} className="bg-gray-900 dark:bg-white text-white dark:text-black px-6 py-3.5 rounded-2xl font-bold shadow-lg shadow-gray-200 dark:shadow-none flex items-center gap-2 hover:-translate-y-1 transition-transform">
+                        <Plus size={20} /> Add New Transaction
+                 </button>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
@@ -703,6 +864,41 @@ const App = () => {
                                 </ResponsiveContainer>
                             )}
                         </div>
+                    </div>
+
+                    {/* NEW PIE CHART CARD ON DASHBOARD */}
+                    <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-8 shadow-sm border border-gray-100 dark:border-gray-800">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                            <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400"><PieChart size={18}/></div>
+                            Spending Breakdown
+                        </h3>
+                        {pieData.length > 0 ? (
+                            <div className="flex flex-col md:flex-row items-center gap-8">
+                                <div className="h-48 w-48 relative">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <RePieChart>
+                                            <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value" stroke="none">
+                                                {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                            </Pie>
+                                            <Tooltip formatter={(val: any) => formatCurrency(Number(val), user!.currency, privacyMode)} />
+                                        </RePieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div className="flex-1 grid grid-cols-2 gap-3 w-full">
+                                    {pieData.map((entry, index) => (
+                                        <div key={index} className="flex items-center gap-2">
+                                            <div className="w-3 h-3 rounded-full shrink-0" style={{backgroundColor: COLORS[index % COLORS.length]}}></div>
+                                            <div className="overflow-hidden">
+                                                <p className="text-[10px] font-bold text-gray-500 uppercase truncate">{entry.name}</p>
+                                                <p className="text-xs font-bold text-gray-900 dark:text-white">{formatCurrency(entry.value, user!.currency, privacyMode)}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-center text-gray-400 font-medium py-10">No expense data to analyze yet.</p>
+                        )}
                     </div>
 
                     <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-8 shadow-sm border border-gray-100 dark:border-gray-800">
@@ -768,9 +964,8 @@ const App = () => {
                     </div>
 
                     <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Quick Actions</h3>
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Quick Navigation</h3>
                         <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => { setTransType(TransactionType.INCOME); setShowAddModal(true); }} className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-bold text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors text-center">Add Income</button>
                             <button onClick={() => { setView(ViewState.TOOLS); }} className="p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-bold text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors text-center">Tools</button>
                             <button onClick={() => { setView(ViewState.INVESTMENTS); }} className="p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 font-bold text-sm hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors text-center">Invest</button>
                             <button onClick={() => { setView(ViewState.PROFILE); }} className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-center">Settings</button>
@@ -782,209 +977,184 @@ const App = () => {
       );
   };
 
-  const renderManager = (type: TransactionType) => {
-    const filtered = transactions.filter(t => t.type === type);
-    const categoryTotals: Record<string, number> = {};
-    filtered.forEach(t => { categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount; });
-    const pieData = Object.keys(categoryTotals).map(cat => ({ name: cat, value: categoryTotals[cat] })).sort((a,b) => b.value - a.value);
-    const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#f43f5e', '#84cc16'];
+  const renderManager = (currentType: TransactionType) => {
+    const filtered = transactions.filter(t => t.type === currentType);
+    const total = filtered.reduce((acc, t) => acc + t.amount, 0);
 
     return (
-      <div className="space-y-8 animate-fade-in max-w-7xl mx-auto w-full">
-         <div className="flex justify-between items-center">
-            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white capitalize tracking-tight">{type === TransactionType.EXPENSE ? 'Expenses' : 'Income'}</h2>
-             <button onClick={() => { setTransType(type); setShowAddModal(true); }} className="bg-gray-900 dark:bg-white text-white dark:text-black px-6 py-3.5 rounded-2xl font-bold shadow-lg shadow-gray-200 dark:shadow-none flex items-center gap-2 hover:-translate-y-1 transition-transform">
-                <Plus size={20} /> Add New
-            </button>
+      <div className="space-y-6 animate-fade-in max-w-7xl mx-auto w-full">
+         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+             <div>
+                <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight capitalize">
+                    {currentType === TransactionType.EXPENSE ? 'My Expenses' : 'My Income'}
+                </h2>
+                <p className="text-gray-500 text-sm font-medium mt-1">
+                    Total {currentType === TransactionType.EXPENSE ? 'Spent' : 'Earned'}: <span className={`font-bold ${currentType === TransactionType.EXPENSE ? 'text-rose-600' : 'text-emerald-600'}`}>{formatCurrency(total, user!.currency, privacyMode)}</span>
+                </p>
+             </div>
+             <button onClick={() => { setTransType(currentType); setShowAddModal(true); }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl font-bold shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 transition-transform active:scale-95">
+                 <Plus size={20} /> Add {currentType === TransactionType.EXPENSE ? 'Expense' : 'Income'}
+             </button>
          </div>
 
-         {pieData.length > 0 && (
-             <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col md:flex-row items-center justify-around gap-12">
-                 <div className="w-full md:w-1/2 h-72 relative">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <RePieChart>
-                            <Pie
-                                data={pieData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={70}
-                                outerRadius={90}
-                                paddingAngle={5}
-                                dataKey="value"
-                                stroke="none"
-                            >
-                                {pieData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                            <Tooltip 
-                                formatter={(val: any) => formatCurrency(Number(val), user!.currency, privacyMode)}
-                                contentStyle={{
-                                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                    borderRadius: '16px',
-                                    border: 'none',
-                                    boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
-                                    padding: '12px 16px'
-                                }}
-                                itemStyle={{ color: '#111827', fontWeight: 'bold' }}
-                            />
-                        </RePieChart>
-                    </ResponsiveContainer>
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col">
-                        <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Total</p>
-                        <p className="text-2xl font-extrabold text-gray-900 dark:text-white">{formatCurrency(pieData.reduce((a,b)=>a+b.value,0), user!.currency, privacyMode)}</p>
-                    </div>
+         <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-800 min-h-[50vh] flex flex-col">
+             {filtered.length === 0 ? (
+                 <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-400 py-20">
+                     <div className="bg-gray-50 dark:bg-gray-800 w-24 h-24 rounded-full flex items-center justify-center mb-6">
+                        {currentType === TransactionType.EXPENSE ? <PieChart size={40} opacity={0.3}/> : <Wallet size={40} opacity={0.3}/>}
+                     </div>
+                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Records Found</h3>
+                     <p className="max-w-xs mx-auto">You haven't added any {currentType.toLowerCase()} records yet. Tap the button above to get started.</p>
                  </div>
-                 
-                 <div className="w-full md:w-1/2 grid grid-cols-2 gap-3 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                     {pieData.map((entry, index) => (
-                         <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                             <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{backgroundColor: COLORS[index % COLORS.length]}}></div>
-                             <div className="overflow-hidden">
-                                 <p className="text-xs text-gray-500 font-bold truncate uppercase">{entry.name}</p>
-                                 <p className="text-sm font-bold text-gray-900 dark:text-white">{formatCurrency(entry.value, user!.currency, privacyMode)}</p>
+             ) : (
+                 <div className="space-y-3">
+                     {filtered.map(t => (
+                         <div key={t.id} className="group p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-800 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-lg transition-all flex items-center justify-between">
+                             <div className="flex items-center gap-4 overflow-hidden">
+                                 <div className={`shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-sm ${currentType === TransactionType.EXPENSE ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                                     {currentType === TransactionType.EXPENSE ? <ArrowDownCircle size={24}/> : <ArrowUpCircle size={24}/>}
+                                 </div>
+                                 <div className="min-w-0">
+                                     <h4 className="font-bold text-lg text-gray-900 dark:text-white truncate">{t.title}</h4>
+                                     <div className="flex items-center gap-2 text-xs font-bold text-gray-500 mt-1">
+                                         <span className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded border border-gray-200 dark:border-gray-600">{t.category}</span>
+                                         <span className="opacity-60">{new Date(t.date).toLocaleDateString()}</span>
+                                     </div>
+                                 </div>
+                             </div>
+                             
+                             <div className="flex items-center gap-4 pl-2 shrink-0">
+                                 <span className={`font-extrabold text-xl md:text-2xl ${currentType === TransactionType.EXPENSE ? 'text-gray-900 dark:text-white' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                     {currentType === TransactionType.EXPENSE ? '-' : '+'}{formatCurrency(t.amount, user!.currency, privacyMode)}
+                                 </span>
+                                 <button 
+                                    onClick={(e) => { e.stopPropagation(); deleteTransaction(t.id); }}
+                                    className="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                    title="Delete"
+                                 >
+                                     <Trash2 size={18} />
+                                 </button>
                              </div>
                          </div>
                      ))}
                  </div>
-             </div>
-         )}
-
-         {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 opacity-40">
-                <div className="bg-gray-100 dark:bg-gray-800 p-8 rounded-full mb-6">
-                    {type === TransactionType.EXPENSE ? <Wallet size={56} /> : <TrendingUp size={56} />}
-                </div>
-                <p className="font-bold text-xl">No {type === TransactionType.EXPENSE ? 'expenses' : 'income'} recorded yet.</p>
-            </div>
-         ) : (
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filtered.map(t => (
-                    <div key={t.id} className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 relative group hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
-                        <div className="flex justify-between items-start mb-4">
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 border border-gray-200 dark:border-gray-700 px-2.5 py-1 rounded-lg bg-gray-50 dark:bg-gray-800">{t.category}</span>
-                            <button onClick={() => deleteTransaction(t.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1">
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
-                        <h4 className="font-bold text-lg text-gray-900 dark:text-white mb-1 line-clamp-1">{t.title}</h4>
-                        <p className="text-xs text-gray-400 font-medium mb-5">{new Date(t.date).toLocaleDateString()}</p>
-                        <div className="flex justify-between items-end border-t border-gray-50 dark:border-gray-800 pt-4">
-                             <span className={`text-2xl font-extrabold ${type === TransactionType.INCOME ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-900 dark:text-white'}`}>
-                                {formatCurrency(t.amount, user!.currency, privacyMode)}
-                             </span>
-                        </div>
-                    </div>
-                ))}
-             </div>
-         )}
+             )}
+         </div>
       </div>
     );
   };
 
   const renderProfile = () => {
+      if (!user) return null;
       return (
-          <div className="max-w-2xl mx-auto w-full animate-fade-in space-y-8">
-            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Settings</h2>
-            
-            <div className="bg-white dark:bg-gray-900 rounded-[2rem] p-8 shadow-sm border border-gray-100 dark:border-gray-800">
-                <div className="flex items-center gap-6 mb-8">
-                    <div className="w-24 h-24 rounded-full bg-indigo-50 dark:bg-indigo-900 flex items-center justify-center text-4xl font-bold text-indigo-600 dark:text-indigo-400 shrink-0 border-4 border-white dark:border-gray-800 shadow-lg">
-                        {user?.name.charAt(0)}
+        <div className="space-y-8 animate-fade-in max-w-4xl mx-auto w-full">
+            <div>
+                <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Settings</h2>
+                <p className="text-gray-500 text-sm font-medium mt-1">Manage your account preferences.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Profile Card */}
+                <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 md:col-span-2 flex flex-col md:flex-row items-center gap-8">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-4xl font-bold text-white shadow-lg shadow-indigo-200 dark:shadow-none shrink-0">
+                        {user.name.charAt(0)}
                     </div>
-                    <div className="flex-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">Display Name</label>
-                        <input 
-                            value={user?.name} 
-                            onChange={(e) => updateUser({ name: e.target.value })}
-                            className="text-2xl font-bold text-gray-900 dark:text-white bg-transparent border-b-2 border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none w-full transition-colors pb-1"
-                        />
-                        <p className="text-gray-500 font-medium text-sm mt-2">{user?.email}</p>
+                    <div className="text-center md:text-left flex-1">
+                        <h3 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-1">{user.name}</h3>
+                        <p className="text-gray-500 font-medium mb-4">{user.email}</p>
+                        <div className="flex flex-wrap justify-center md:justify-start gap-2">
+                             <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-bold flex items-center gap-1">
+                                 <CheckCircle2 size={12}/> {user.cloudConnected ? 'Cloud Sync Active' : 'Offline'}
+                             </span>
+                             <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-full text-xs font-bold uppercase">
+                                 {user.currency}
+                             </span>
+                        </div>
                     </div>
+                    <button onClick={handleLogout} className="bg-gray-100 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 text-gray-900 dark:text-white px-6 py-3 rounded-xl font-bold transition-all text-sm flex items-center gap-2">
+                        <LogOut size={18}/> Sign Out
+                    </button>
                 </div>
 
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                         <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-white dark:bg-gray-700 rounded-xl shadow-sm"><Globe size={20} className="text-indigo-600 dark:text-indigo-400"/></div>
-                            <span className="font-bold text-gray-900 dark:text-white">Currency</span>
+                {/* Preferences */}
+                <div className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 space-y-6">
+                     <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                         <Settings size={20} className="text-gray-400"/> General
+                     </h4>
+                     
+                     <div className="space-y-4">
+                         <div>
+                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Display Name</label>
+                             <div className="flex gap-2">
+                                 <input 
+                                    value={user.name} 
+                                    onChange={e => updateUser({ name: e.target.value })}
+                                    className="flex-1 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-indigo-500 rounded-xl px-4 py-2 font-bold text-gray-900 dark:text-white outline-none transition-colors"
+                                 />
+                                 <button className="bg-indigo-600 text-white p-2.5 rounded-xl"><Edit2 size={18}/></button>
+                             </div>
                          </div>
-                         <select 
-                            value={user?.currency}
-                            onChange={(e) => updateUser({ currency: e.target.value as CurrencyCode })}
-                            className="bg-transparent font-bold text-gray-600 dark:text-gray-300 outline-none text-right cursor-pointer"
+                         
+                         <div>
+                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Currency</label>
+                             <select 
+                                value={user.currency} 
+                                onChange={e => updateUser({ currency: e.target.value as CurrencyCode })}
+                                className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-indigo-500 rounded-xl px-4 py-3 font-bold text-gray-900 dark:text-white outline-none cursor-pointer appearance-none transition-colors"
+                             >
+                                 {Object.keys(CURRENCY_SYMBOLS).map(c => <option key={c} value={c}>{c} ({CURRENCY_SYMBOLS[c as CurrencyCode]})</option>)}
+                             </select>
+                         </div>
+                     </div>
+                </div>
+
+                {/* Appearance & Security */}
+                <div className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 space-y-6">
+                     <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                         <ShieldAlert size={20} className="text-gray-400"/> Appearance & Security
+                     </h4>
+
+                     <div className="space-y-3">
+                         <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                             <div className="flex items-center gap-3">
+                                 {user.theme === 'dark' ? <Moon size={20} className="text-indigo-600"/> : <Sun size={20} className="text-orange-500"/>}
+                                 <span className="font-bold text-sm">Dark Mode</span>
+                             </div>
+                             <button 
+                                onClick={() => updateUser({ theme: user.theme === 'dark' ? 'light' : 'dark' })}
+                                className={`w-12 h-7 rounded-full p-1 transition-colors ${user.theme === 'dark' ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                             >
+                                 <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${user.theme === 'dark' ? 'translate-x-5' : ''}`}></div>
+                             </button>
+                         </div>
+
+                         <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                             <div className="flex items-center gap-3">
+                                 {privacyMode ? <EyeOff size={20} className="text-gray-600 dark:text-gray-400"/> : <Eye size={20} className="text-indigo-600"/>}
+                                 <span className="font-bold text-sm">Privacy Mode</span>
+                             </div>
+                             <button 
+                                onClick={togglePrivacy}
+                                className={`w-12 h-7 rounded-full p-1 transition-colors ${privacyMode ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                             >
+                                 <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${privacyMode ? 'translate-x-5' : ''}`}></div>
+                             </button>
+                         </div>
+                         
+                         <button 
+                            onClick={() => setShowPasswordModal(true)}
+                            className="w-full flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-xl transition-colors group"
                          >
-                             {Object.keys(CURRENCY_SYMBOLS).map(c => <option key={c} value={c}>{c} ({CURRENCY_SYMBOLS[c as CurrencyCode]})</option>)}
-                         </select>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                         <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-white dark:bg-gray-700 rounded-xl shadow-sm">{user?.theme === 'dark' ? <Moon size={20} className="text-purple-500"/> : <Sun size={20} className="text-orange-500"/>}</div>
-                            <span className="font-bold text-gray-900 dark:text-white">Appearance</span>
-                         </div>
-                         <button onClick={() => updateUser({ theme: user?.theme === 'dark' ? 'light' : 'dark' })} className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                            {user?.theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+                             <div className="flex items-center gap-3">
+                                 <Lock size={20} className="text-indigo-600 dark:text-indigo-400"/>
+                                 <span className="font-bold text-sm text-indigo-900 dark:text-indigo-200">Change Password</span>
+                             </div>
+                             <ChevronRight size={18} className="text-indigo-400 group-hover:translate-x-1 transition-transform"/>
                          </button>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                         <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-white dark:bg-gray-700 rounded-xl shadow-sm">{privacyMode ? <EyeOff size={20} className="text-gray-600 dark:text-gray-300"/> : <Eye size={20} className="text-gray-600 dark:text-gray-300"/>}</div>
-                            <span className="font-bold text-gray-900 dark:text-white">Privacy Mode</span>
-                         </div>
-                         <button onClick={togglePrivacy} className={`w-12 h-7 rounded-full transition-colors relative ${privacyMode ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                             <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${privacyMode ? 'translate-x-5' : ''}`}></div>
-                         </button>
-                    </div>
-
-                    {/* Change Password Button */}
-                    <button 
-                        onClick={() => { setShowPasswordModal(true); setPassMsg(null); }}
-                        className="w-full p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-between group"
-                    >
-                         <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-white dark:bg-gray-700 rounded-xl shadow-sm group-hover:scale-110 transition-transform"><KeyRound size={20} className="text-indigo-600 dark:text-indigo-400"/></div>
-                            <span className="font-bold text-gray-900 dark:text-white">Change Password</span>
-                         </div>
-                         <ChevronRight size={20} className="text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"/>
-                    </button>
-
-                    {/* NEW SIGN OUT BUTTON */}
-                    <button 
-                        onClick={handleLogout}
-                        className="w-full p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors flex items-center justify-between group mt-4 border border-red-100 dark:border-red-900/20"
-                    >
-                         <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-white dark:bg-red-900/30 rounded-xl shadow-sm group-hover:scale-110 transition-transform"><LogOut size={20} className="text-red-600 dark:text-red-400"/></div>
-                            <span className="font-bold text-red-700 dark:text-red-400">Sign Out</span>
-                         </div>
-                    </button>
+                     </div>
                 </div>
             </div>
-
-            <div className="bg-rose-50 dark:bg-rose-900/10 rounded-[2rem] p-8 border border-rose-100 dark:border-rose-900/20">
-                 <h4 className="text-lg font-bold text-rose-600 dark:text-rose-400 mb-2 flex items-center gap-2">
-                    <ShieldAlert size={20}/> Danger Zone
-                 </h4>
-                 <p className="text-sm text-rose-600/70 dark:text-rose-400/70 mb-6 leading-relaxed">
-                    Clear local transaction history. Useful if the app feels slow. Cloud data (if synced) restores on next login.
-                 </p>
-                 <button 
-                    onClick={() => { 
-                        if(window.confirm("Are you sure? This will remove all transactions from this device.")) {
-                            setTransactions([]); 
-                            secureSave(`mmp_transactions_${user!.id}`, []);
-                        }
-                    }} 
-                    className="bg-white dark:bg-transparent text-rose-600 border-2 border-rose-200 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-900/20 px-6 py-3 rounded-xl font-bold text-sm transition-colors"
-                 >
-                    Reset Local Data
-                 </button>
-            </div>
-            
-             <p className="text-center text-xs text-gray-400 font-medium pt-8">Version 2.0 • Pro Edition</p>
-          </div>
+        </div>
       );
   };
 

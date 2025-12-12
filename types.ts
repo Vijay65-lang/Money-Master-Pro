@@ -38,6 +38,7 @@ export enum ViewState {
   TOOLS = 'TOOLS',
   AI_BRAIN = 'AI_BRAIN',
   PROFILE = 'PROFILE',
+  RESET_PASSWORD = 'RESET_PASSWORD',
 }
 
 export interface ChartData {
