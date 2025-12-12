@@ -136,8 +136,7 @@ const Sidebar = ({ view, setView, handleLogout, user, isMobile }: any) => (
 );
 
 // 5. Auth Screen
-const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
-    // ... (No changes to AuthScreen logic, keeping it same)
+const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => Promise<void> | void }) => {
     const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -153,23 +152,39 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
         setError(''); setSuccessMsg(''); setLoading(true);
         const cleanEmail = email.trim().toLowerCase();
         
-        if (mode === 'forgot') {
-            const { success, error } = await sbResetPassword(cleanEmail);
-            setLoading(false);
-            if (success) setSuccessMsg("Reset link sent! Check your email."); else setError(error || "Failed.");
-            return;
-        }
-
-        if (mode === 'login') {
-            const { user, error } = await sbLogin(cleanEmail, password);
-            setLoading(false);
-            if (error) setError(error); else if (user) onLogin(user);
-        } else {
-            const { success, error, msg } = await sbSignup(cleanEmail, password, name, currency);
-            setLoading(false);
-            if (error) setError(error); else if (success) {
-                if (msg) { setSuccessMsg(msg); setMode('login'); setPassword(''); } else { const { user } = await sbLogin(cleanEmail, password); if(user) onLogin(user); }
+        try {
+            if (mode === 'forgot') {
+                const { success, error } = await sbResetPassword(cleanEmail);
+                setLoading(false);
+                if (success) setSuccessMsg("Reset link sent! Check your email."); else setError(error || "Failed.");
+                return;
             }
+
+            if (mode === 'login') {
+                const { user, error } = await sbLogin(cleanEmail, password);
+                if (error) {
+                    setLoading(false);
+                    setError(error);
+                } else if (user) {
+                    // Pass to App to handle loading data
+                    await onLogin(user);
+                    // Loading state is managed by App now, but just in case:
+                    setLoading(false);
+                }
+            } else {
+                const { success, error, msg } = await sbSignup(cleanEmail, password, name, currency);
+                setLoading(false);
+                if (error) setError(error); else if (success) {
+                    if (msg) { setSuccessMsg(msg); setMode('login'); setPassword(''); } else { 
+                        // Auto login after signup
+                        const { user } = await sbLogin(cleanEmail, password); 
+                        if(user) await onLogin(user); 
+                    }
+                }
+            }
+        } catch (e) {
+            setLoading(false);
+            setError("An unexpected error occurred.");
         }
     };
 
@@ -332,7 +347,7 @@ const DashboardContent = ({ view, user, transactions, balance, income, expense, 
                     <h3 className="text-xl font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                         <BarChart3 className="text-indigo-500" /> Financial Overview
                     </h3>
-                    <div className="h-[250px] w-full">
+                    <div className="h-[250px] w-full min-w-[200px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={dashboardChartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#374151" opacity={0.2} />
@@ -368,7 +383,7 @@ const DashboardContent = ({ view, user, transactions, balance, income, expense, 
                         {/* CHART SECTION */}
                         {activeChartData.length > 0 && (
                             <GlassCard className="p-6 md:p-8 min-h-[300px] flex flex-col md:flex-row items-center justify-around">
-                                <div className="w-full md:w-1/2 h-[250px] relative">
+                                <div className="w-full md:w-1/2 h-[250px] relative min-w-[200px]">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <RePieChart>
                                             <Pie
@@ -533,6 +548,7 @@ const App = () => {
   const [resetMode, setResetMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAiChat, setShowAiChat] = useState(false);
+  const userRef = useRef<UserProfile | null>(null); // To track user in closure
 
   // AI Chat State
   const [chatQuery, setChatQuery] = useState("");
@@ -544,6 +560,24 @@ const App = () => {
   const [editName, setEditName] = useState("");
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
+  // Keep ref in sync
+  useEffect(() => { userRef.current = user; }, [user]);
+
+  // Enhanced Login Handler to load data immediately
+  const handleLogin = async (loggedInUser: UserProfile) => {
+      setLoading(true);
+      try {
+          setUser(loggedInUser);
+          setEditName(loggedInUser.name);
+          const txs = await sbLoadTransactions(loggedInUser.id);
+          setTransactions(txs);
+      } catch (e) {
+          console.error("Login Data Load Error", e);
+      } finally {
+          setLoading(false);
+      }
+  };
+
   // Init
   useEffect(() => {
     // Safety timeout - prevent loading forever if Supabase hangs
@@ -553,33 +587,45 @@ const App = () => {
     if (hash && hash.includes('type=recovery')) { setResetMode(true); setLoading(false); clearTimeout(timer); return; }
 
     const initAuth = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-           const profile = await sbGetOrCreateProfile(session.user);
-           if (profile) { 
-               setUser(profile); 
-               setEditName(profile.name);
-               const txs = await sbLoadTransactions(profile.id); 
-               setTransactions(txs); 
-           }
-        }
-        setLoading(false);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+               const profile = await sbGetOrCreateProfile(session.user);
+               if (profile) { 
+                   setUser(profile); 
+                   setEditName(profile.name);
+                   const txs = await sbLoadTransactions(profile.id); 
+                   setTransactions(txs); 
+               }
+            }
+        } catch(e) { console.error("Init Auth Error", e); }
+        finally { setLoading(false); }
     };
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'PASSWORD_RECOVERY') setResetMode(true);
         else if (event === 'SIGNED_IN' && session?.user) {
-            setLoading(true);
-            const profile = await sbGetOrCreateProfile(session.user);
-            if (profile) { 
-                setUser(profile); 
-                setEditName(profile.name);
-                const txs = await sbLoadTransactions(profile.id); 
-                setTransactions(txs); 
+            // Check if user is already loaded to avoid double loading or overwriting state unexpectedly
+            if (userRef.current?.id !== session.user.id) {
+                setLoading(true);
+                try {
+                    const profile = await sbGetOrCreateProfile(session.user);
+                    if (profile) { 
+                        setUser(profile); 
+                        setEditName(profile.name);
+                        const txs = await sbLoadTransactions(profile.id); 
+                        setTransactions(txs); 
+                    }
+                } catch(e) { console.error("Auth Change Error", e); }
+                finally { setLoading(false); }
             }
+        } else if (event === 'SIGNED_OUT') { 
+            setUser(null); 
+            setTransactions([]); 
+            setView(ViewState.HOME); 
             setLoading(false);
-        } else if (event === 'SIGNED_OUT') { setUser(null); setTransactions([]); setView(ViewState.HOME); }
+        }
     });
     return () => {
         subscription.unsubscribe();
@@ -642,9 +688,17 @@ const App = () => {
     setChatLoading(false);
   };
 
-  if (loading) return <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center gap-4"><Loader2 className="animate-spin text-indigo-600" size={40} /><p className="text-gray-500 font-bold animate-pulse">Loading System...</p></div>;
+  if (loading) return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center gap-4">
+          <Loader2 className="animate-spin text-indigo-600" size={40} />
+          <p className="text-gray-500 font-bold animate-pulse">Loading System...</p>
+          <button onClick={() => setLoading(false)} className="mt-4 text-xs font-bold text-indigo-500 hover:text-indigo-600 underline cursor-pointer">
+              Taking too long? Click here
+          </button>
+      </div>
+  );
   if (resetMode) return <div className="min-h-screen bg-slate-50 dark:bg-gray-950 p-4"><div className="max-w-md mx-auto mt-20 bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-xl"><h2 className="text-2xl font-bold mb-4 dark:text-white">Reset Password</h2><p className="mb-4 text-gray-500">Enter your new password below.</p>{/* Reset Logic Here */}<button onClick={() => setResetMode(false)} className="text-indigo-600 font-bold">Cancel</button></div></div>;
-  if (!user) return <AuthScreen onLogin={setUser} />;
+  if (!user) return <AuthScreen onLogin={handleLogin} />;
 
   const income = transactions.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);
   const expense = transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
