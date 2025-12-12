@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Calculator, Percent, TrendingUp, CreditCard, PieChart, 
@@ -734,64 +735,4 @@ export const Tools: React.FC<ToolsProps> = ({ currency, userId, privacyMode }) =
              {activeTool === 'mortgage' && <MortgageCalc symbol={symbol} userId={userId} privacyMode={privacyMode} />} 
              {activeTool === 'debt_pay' && <DebtPayoff symbol={symbol} userId={userId} privacyMode={privacyMode} />}
              {activeTool === 'breakeven' && <BreakEven symbol={symbol} userId={userId} privacyMode={privacyMode} />}
-             {activeTool === 'margin' && <MarginCalc symbol={symbol} userId={userId} privacyMode={privacyMode} />}
-             
-             {/* Utility */}
-             {activeTool === 'fuel' && <FuelCalculator symbol={symbol} userId={userId} privacyMode={privacyMode} />}
-             {activeTool === 'tax' && <TaxEstimator symbol={symbol} userId={userId} privacyMode={privacyMode} />}
-             {activeTool === 'currency' && <CurrencyConverter userId={userId} privacyMode={privacyMode} />}
-             {activeTool === 'inflation' && <Inflation symbol={symbol} userId={userId} privacyMode={privacyMode} />}
-             {activeTool === 'gst' && <GSTCalc symbol={symbol} userId={userId} privacyMode={privacyMode} />}
-             {activeTool === 'vat' && <VATCalc symbol={symbol} userId={userId} privacyMode={privacyMode} />}
-             {activeTool === 'shopping' && <ShoppingList symbol={symbol} userId={userId} privacyMode={privacyMode} />}
-             {activeTool === 'discount' && <DiscountCalculator symbol={symbol} userId={userId} privacyMode={privacyMode} />}
-             {activeTool === 'tip' && <TipCalculator symbol={symbol} userId={userId} privacyMode={privacyMode} />}
-          </div>
-
-          {/* Help Modal */}
-          {showHelp && (
-            <div className="absolute inset-0 z-20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-[2.5rem] flex flex-col items-center justify-center p-6 animate-fade-in text-center">
-               <div className="bg-indigo-100 dark:bg-indigo-900/50 p-5 rounded-full text-indigo-600 dark:text-indigo-300 mb-6 shadow-xl shadow-indigo-100 dark:shadow-none">
-                  <HelpCircle size={48} />
-               </div>
-               <h3 className="text-2xl font-bold text-black dark:text-white mb-3 capitalize">{activeTool}</h3>
-               <p className="text-gray-600 dark:text-gray-300 mb-8 leading-relaxed max-w-sm mx-auto text-base font-medium">
-                 {TOOL_DESCRIPTIONS[activeTool] || "Use this tool to plan your finances accurately."}
-               </p>
-               <button 
-                 onClick={() => setShowHelp(false)}
-                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-3.5 rounded-xl font-bold shadow-xl shadow-indigo-200 dark:shadow-none transition-transform hover:scale-105"
-               >
-                 Got it!
-               </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5 pb-20 overflow-y-auto custom-scrollbar">
-             {tools.map((tool) => (
-                <button
-                key={tool.id}
-                onClick={() => setActiveTool(tool.id)}
-                className="flex flex-col items-center justify-center p-5 py-8 bg-white dark:bg-gray-900 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-xl hover:shadow-gray-200 dark:hover:shadow-none hover:border-indigo-100 dark:hover:border-indigo-900 transition-all active:scale-95 group hover:-translate-y-1 relative overflow-hidden"
-                >
-                <div className={`p-4 rounded-2xl mb-4 transition-transform shadow-sm ${getColor(tool.color)} group-hover:scale-110 duration-300`}>
-                    <tool.icon size={28} />
-                </div>
-                <span className="font-bold text-gray-900 dark:text-white text-xs md:text-sm text-center group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{tool.name}</span>
-                </button>
-            ))}
-            
-            {/* Promo Card mixed in */}
-            <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-[2rem] p-6 text-white flex flex-col justify-center items-center text-center shadow-lg relative overflow-hidden group cursor-pointer">
-                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <TrendingUp size={36} className="mb-3" />
-                <h4 className="font-bold text-lg leading-tight">Pro Features</h4>
-                <p className="text-xs opacity-80 mt-1">Unlock advanced charts & unlimited history.</p>
-                <span className="mt-4 bg-white/20 backdrop-blur-sm border border-white/30 px-4 py-1.5 rounded-full text-xs font-bold hover:bg-white hover:text-indigo-600 transition-colors">Upgrade</span>
-            </div>
-        </div>
-      )}
-    </div>
-  );
-};
+             {activeTool === 'margin'
