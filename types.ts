@@ -5,17 +5,36 @@ export enum TransactionType {
 }
 
 export enum Category {
-  FOOD = 'Food',
+  // INCOME
+  SALARY = 'Salary',
+  FREELANCE = 'Freelance',
+  BUSINESS = 'Business',
+  INVESTMENTS = 'Investments',
+  RENTAL = 'Rental Income',
+  DIVIDENDS = 'Dividends',
+  INTEREST = 'Interest',
+  REFUNDS = 'Refunds',
+  GIFTS = 'Gifts',
+  BONUS = 'Bonus',
+  GRANTS = 'Grants',
+  
+  // EXPENSE
+  FOOD = 'Food & Dining',
+  GROCERIES = 'Groceries',
   TRAVEL = 'Travel',
   SHOPPING = 'Shopping',
-  BILLS = 'Bills & EMI',
-  ENTERTAINMENT = 'Movies/Fun',
-  GROCERIES = 'Groceries',
-  MEDICAL = 'Medical',
-  SALARY = 'Salary',
-  BUSINESS = 'Business',
-  FREELANCE = 'Freelance',
-  INVESTMENT_RETURN = 'Returns',
+  HOUSING = 'Housing & Rent',
+  BILLS = 'Bills & Utilities',
+  MEDICAL = 'Healthcare',
+  ENTERTAINMENT = 'Entertainment',
+  EDUCATION = 'Education',
+  PERSONAL = 'Personal Care',
+  INSURANCE = 'Insurance',
+  DEBT = 'Debt & EMI',
+  TAXES = 'Taxes',
+  CHARITY = 'Charity',
+  
+  // BOTH
   OTHERS = 'Others',
 }
 

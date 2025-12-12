@@ -1,14 +1,28 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Home, Wallet, TrendingUp, Grid, Plus, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Bot, X, Settings, LogOut, User as UserIcon, Lock, ChevronRight, Globe, Moon, Sun, Edit2, LayoutDashboard, Eye, EyeOff, ShieldAlert, Cloud, Server, Database, AlertCircle, CheckCircle2, Mail, KeyRound, BarChart3, ExternalLink, MessageCircle, HelpCircle, Loader2, Download, RefreshCw, Zap, List, FileText, UserCog, Save } from 'lucide-react';
+import { Home, Wallet, TrendingUp, Grid, Plus, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Bot, X, Settings, LogOut, User as UserIcon, Lock, ChevronRight, Globe, Moon, Sun, Edit2, LayoutDashboard, Eye, EyeOff, ShieldAlert, Cloud, Server, Database, AlertCircle, CheckCircle2, Mail, KeyRound, BarChart3, ExternalLink, MessageCircle, HelpCircle, Loader2, Download, RefreshCw, Zap, List, FileText, UserCog, Save, Tag } from 'lucide-react';
 import { Transaction, TransactionType, ViewState, Category, UserProfile, CurrencyCode, CURRENCY_SYMBOLS, Theme } from './types';
 import { Investments } from './components/Investments';
 import { Tools } from './components/Tools';
-import { getFinancialAdvice, categorizeExpense } from './services/geminiService';
+import { getFinancialAdvice } from './services/geminiService';
 import { sbLogin, sbSignup, sbLogout, sbSaveTransaction, sbLoadTransactions, sbDeleteTransaction, sbUpdateProfile, sbResetPassword, sbUpdateUserPassword, sbGetOrCreateProfile, supabase } from './services/supabaseService';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
 
 // --- CONSTANTS & HELPERS ---
-const COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6'];
+const COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6', '#84cc16', '#06b6d4', '#d946ef', '#f97316'];
+
+const INCOME_CATEGORIES = [
+    Category.SALARY, Category.FREELANCE, Category.BUSINESS, Category.INVESTMENTS, 
+    Category.RENTAL, Category.DIVIDENDS, Category.INTEREST, Category.BONUS, 
+    Category.REFUNDS, Category.GIFTS, Category.GRANTS, Category.OTHERS
+];
+
+const EXPENSE_CATEGORIES = [
+    Category.FOOD, Category.GROCERIES, Category.HOUSING, Category.BILLS, 
+    Category.TRAVEL, Category.SHOPPING, Category.MEDICAL, Category.ENTERTAINMENT, 
+    Category.EDUCATION, Category.DEBT, Category.INSURANCE, Category.PERSONAL, 
+    Category.TAXES, Category.CHARITY, Category.OTHERS
+];
 
 const formatCurrency = (amount: number, code: CurrencyCode, privacyMode: boolean = false) => {
   if (privacyMode) return '••••';
@@ -19,7 +33,6 @@ const formatCurrency = (amount: number, code: CurrencyCode, privacyMode: boolean
 // --- COMPONENTS ---
 
 // 1. Futuristic Card Component
-// Fix: Made children optional to resolve TS error "Property 'children' is missing"
 const GlassCard = ({ children, className = "" }: { children?: React.ReactNode, className?: string }) => (
     <div className={`bg-white/80 dark:bg-gray-900/60 backdrop-blur-xl border border-white/20 dark:border-gray-700/50 shadow-xl rounded-[2rem] ${className}`}>
         {children}
@@ -124,6 +137,7 @@ const Sidebar = ({ view, setView, handleLogout, user, isMobile }: any) => (
 
 // 5. Auth Screen
 const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
+    // ... (No changes to AuthScreen logic, keeping it same)
     const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -161,7 +175,6 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
 
     return (
         <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden">
-            {/* Ambient Background */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[120px]"></div>
                 <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 rounded-full blur-[120px]"></div>
@@ -226,8 +239,17 @@ const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => void }) => {
 const DashboardContent = ({ view, user, transactions, balance, income, expense, onAddTx, onDeleteTx, onOpenAi }: any) => {
     const [title, setTitle] = useState('');
     const [amount, setAmount] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [loadingCat, setLoadingCat] = useState(false);
     
+    // Determine categories based on view
+    const availableCategories = view === ViewState.INCOME ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
+    // Set default category when view changes
+    useEffect(() => {
+        setSelectedCategory(availableCategories[0]);
+    }, [view]);
+
     // Filter transactions
     const displayTxs = view === ViewState.HOME 
         ? transactions.slice(0, 5) 
@@ -262,7 +284,10 @@ const DashboardContent = ({ view, user, transactions, balance, income, expense, 
         if(!title || !amount) return;
         setLoadingCat(true);
         const type = view === ViewState.INCOME ? TransactionType.INCOME : TransactionType.EXPENSE;
-        await onAddTx(title, parseFloat(amount), type);
+        
+        // Instant add - no AI wait
+        await onAddTx(title, parseFloat(amount), type, selectedCategory);
+        
         setTitle('');
         setAmount('');
         setLoadingCat(false);
@@ -391,13 +416,27 @@ const DashboardContent = ({ view, user, transactions, balance, income, expense, 
 
                         <GlassCard className="p-1">
                              <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-2 p-2">
-                                <input 
-                                    value={title} onChange={e=>setTitle(e.target.value)}
-                                    placeholder="Description (e.g. Freelance, Coffee)" 
-                                    className="flex-1 bg-transparent p-4 font-bold outline-none text-gray-900 dark:text-white placeholder-gray-400"
-                                />
-                                <div className="h-px md:h-auto md:w-px bg-gray-200 dark:bg-gray-700 mx-2"></div>
-                                <div className="relative w-full md:w-48">
+                                <div className="flex-1 flex flex-col md:flex-row gap-2">
+                                     <input 
+                                        value={title} onChange={e=>setTitle(e.target.value)}
+                                        placeholder="Description (e.g. Salary, Rent)" 
+                                        className="flex-1 bg-transparent p-4 font-bold outline-none text-gray-900 dark:text-white placeholder-gray-400 border-b md:border-b-0 md:border-r border-gray-100 dark:border-gray-800"
+                                     />
+                                     <div className="relative md:w-48">
+                                         <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                         <select 
+                                            value={selectedCategory} 
+                                            onChange={e => setSelectedCategory(e.target.value)}
+                                            className="w-full h-full bg-transparent p-4 pl-10 font-bold outline-none text-gray-500 dark:text-gray-400 cursor-pointer appearance-none"
+                                         >
+                                            {availableCategories.map(c => <option key={c} value={c} className="bg-white dark:bg-gray-900 text-black dark:text-white">{c}</option>)}
+                                         </select>
+                                     </div>
+                                </div>
+
+                                <div className="h-px md:h-auto md:w-px bg-gray-200 dark:bg-gray-700 mx-2 hidden md:block"></div>
+                                
+                                <div className="relative w-full md:w-40">
                                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">{CURRENCY_SYMBOLS[user.currency as CurrencyCode]}</span>
                                      <input 
                                         type="number"
@@ -507,8 +546,11 @@ const App = () => {
 
   // Init
   useEffect(() => {
+    // Safety timeout - prevent loading forever if Supabase hangs
+    const timer = setTimeout(() => setLoading(false), 5000);
+
     const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) { setResetMode(true); setLoading(false); return; }
+    if (hash && hash.includes('type=recovery')) { setResetMode(true); setLoading(false); clearTimeout(timer); return; }
 
     const initAuth = async () => {
         const { data: { session } } = await supabase.auth.getSession();
@@ -539,7 +581,10 @@ const App = () => {
             setLoading(false);
         } else if (event === 'SIGNED_OUT') { setUser(null); setTransactions([]); setView(ViewState.HOME); }
     });
-    return () => subscription.unsubscribe();
+    return () => {
+        subscription.unsubscribe();
+        clearTimeout(timer);
+    };
   }, []);
 
   // Sync Theme
@@ -557,11 +602,17 @@ const App = () => {
       await sbUpdateProfile(user.id, updatedUser);
   };
 
-  const handleAddTx = async (title: string, amount: number, type: TransactionType) => {
+  const handleAddTx = async (title: string, amount: number, type: TransactionType, selectedCategory: string) => {
      if(!user) return;
-     let category = type === TransactionType.INCOME ? Category.SALARY : Category.OTHERS;
-     if(type === TransactionType.EXPENSE) { const catStr = await categorizeExpense(title); category = catStr as Category; }
-     const newTx: Transaction = { id: crypto.randomUUID(), title, amount, type, category, date: new Date().toISOString() };
+     
+     // Manual selection is prioritized. 
+     // If no category selected (shouldn't happen due to default), fallback to Others.
+     let category = selectedCategory;
+     if (!category) {
+        category = Category.OTHERS;
+     }
+
+     const newTx: Transaction = { id: crypto.randomUUID(), title, amount, type, category: category as Category, date: new Date().toISOString() };
      const updated = [newTx, ...transactions];
      setTransactions(updated);
      await sbSaveTransaction(user.id, newTx);
