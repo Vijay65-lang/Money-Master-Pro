@@ -4,6 +4,7 @@ import { Home, Wallet, TrendingUp, Grid, Plus, PieChart, ArrowUpCircle, ArrowDow
 import { Transaction, TransactionType, ViewState, Category, UserProfile, CurrencyCode, CURRENCY_SYMBOLS, Theme } from './types';
 import { Investments } from './components/Investments';
 import { Tools } from './components/Tools';
+import { ResetPasswordPage } from './components/ResetPasswordPage'; // NEW IMPORT
 import { getFinancialAdvice } from './services/geminiService';
 import { sbLogin, sbSignup, sbLogout, sbSaveTransaction, sbLoadTransactions, sbDeleteTransaction, sbUpdateProfile, sbResetPassword, sbUpdateUserPassword, sbGetOrCreateProfile, supabase } from './services/supabaseService';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
@@ -548,7 +549,7 @@ const App = () => {
   const [resetMode, setResetMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAiChat, setShowAiChat] = useState(false);
-  const userRef = useRef<UserProfile | null>(null); // To track user in closure
+  const userRef = useRef<UserProfile | null>(null);
 
   // AI Chat State
   const [chatQuery, setChatQuery] = useState("");
@@ -560,10 +561,8 @@ const App = () => {
   const [editName, setEditName] = useState("");
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
-  // Keep ref in sync
   useEffect(() => { userRef.current = user; }, [user]);
 
-  // Enhanced Login Handler to load data immediately
   const handleLogin = async (loggedInUser: UserProfile) => {
       setLoading(true);
       try {
@@ -578,18 +577,24 @@ const App = () => {
       }
   };
 
-  // Init
   useEffect(() => {
-    // Safety timeout - prevent loading forever if Supabase hangs
-    const timer = setTimeout(() => setLoading(false), 5000);
+    // 1. Force check immediately on mount - PRIORITIZE RESET MODE
+    const checkHash = () => {
+        const hash = window.location.hash;
+        if (hash && (hash.includes('type=recovery') || hash.includes('reset-password'))) {
+            setResetMode(true);
+            setLoading(false);
+        }
+    };
+    checkHash();
 
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) { setResetMode(true); setLoading(false); clearTimeout(timer); return; }
+    const timer = setTimeout(() => setLoading(false), 5000);
 
     const initAuth = async () => {
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
+            // 2. Only auto-login if NOT in recovery mode
+            if (session?.user && !window.location.hash.includes('reset-password') && !window.location.hash.includes('type=recovery')) {
                const profile = await sbGetOrCreateProfile(session.user);
                if (profile) { 
                    setUser(profile); 
@@ -599,27 +604,49 @@ const App = () => {
                }
             }
         } catch(e) { console.error("Init Auth Error", e); }
-        finally { setLoading(false); }
+        finally { 
+             // Only turn off loading if NOT in reset mode (which manages its own state)
+             if (!window.location.hash.includes('reset-password') && !window.location.hash.includes('type=recovery')) setLoading(false); 
+        }
     };
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY') setResetMode(true);
-        else if (event === 'SIGNED_IN' && session?.user) {
-            // Check if user is already loaded to avoid double loading or overwriting state unexpectedly
-            if (userRef.current?.id !== session.user.id) {
-                setLoading(true);
-                try {
-                    const profile = await sbGetOrCreateProfile(session.user);
-                    if (profile) { 
-                        setUser(profile); 
-                        setEditName(profile.name);
-                        const txs = await sbLoadTransactions(profile.id); 
-                        setTransactions(txs); 
-                    }
-                } catch(e) { console.error("Auth Change Error", e); }
-                finally { setLoading(false); }
+        const hash = window.location.hash;
+        
+        // 3. Robust Event Handling - LOCK RESET MODE
+        if (event === 'PASSWORD_RECOVERY' || hash.includes('reset-password') || hash.includes('type=recovery')) {
+            setResetMode(true);
+            setLoading(false);
+            // Force URL update to what the user wants if it's a raw recovery link
+            if (!hash.includes('reset-password')) {
+                window.location.hash = 'reset-password';
             }
+            return;
+        } 
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+             // Double check to prevent race condition where SIGNED_IN fires during recovery
+             // If URL contains reset-password, DO NOT LOAD DASHBOARD
+             if (!resetMode && !hash.includes('reset-password') && !hash.includes('type=recovery')) {
+                if (userRef.current?.id !== session.user.id) {
+                    setLoading(true);
+                    try {
+                        const profile = await sbGetOrCreateProfile(session.user);
+                        if (profile) { 
+                            setUser(profile); 
+                            setEditName(profile.name);
+                            const txs = await sbLoadTransactions(profile.id); 
+                            setTransactions(txs); 
+                        }
+                    } catch(e) { console.error("Auth Change Error", e); }
+                    finally { setLoading(false); }
+                }
+             } else {
+                 // We are signed in but meant to be resetting password
+                 setResetMode(true);
+                 setLoading(false);
+             }
         } else if (event === 'SIGNED_OUT') { 
             setUser(null); 
             setTransactions([]); 
@@ -633,7 +660,6 @@ const App = () => {
     };
   }, []);
 
-  // Sync Theme
   useEffect(() => {
      if(user?.theme === 'dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark');
   }, [user?.theme]);
@@ -650,13 +676,8 @@ const App = () => {
 
   const handleAddTx = async (title: string, amount: number, type: TransactionType, selectedCategory: string) => {
      if(!user) return;
-     
-     // Manual selection is prioritized. 
-     // If no category selected (shouldn't happen due to default), fallback to Others.
      let category = selectedCategory;
-     if (!category) {
-        category = Category.OTHERS;
-     }
+     if (!category) { category = Category.OTHERS; }
 
      const newTx: Transaction = { id: crypto.randomUUID(), title, amount, type, category: category as Category, date: new Date().toISOString() };
      const updated = [newTx, ...transactions];
@@ -672,9 +693,7 @@ const App = () => {
   
   const handleClearData = async () => {
       if(!user) return;
-      // Optimistic clear
       setTransactions([]);
-      // In a real app, delete from DB here
       transactions.forEach(t => sbDeleteTransaction(t.id));
       setDeleteConfirm(false);
   };
@@ -688,6 +707,9 @@ const App = () => {
     setChatLoading(false);
   };
 
+  // RENDER LOGIC: Reset Password takes highest priority
+  if (resetMode) return <ResetPasswordPage onCancel={() => { setResetMode(false); window.location.hash = ''; }} />;
+
   if (loading) return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center gap-4">
           <Loader2 className="animate-spin text-indigo-600" size={40} />
@@ -697,7 +719,7 @@ const App = () => {
           </button>
       </div>
   );
-  if (resetMode) return <div className="min-h-screen bg-slate-50 dark:bg-gray-950 p-4"><div className="max-w-md mx-auto mt-20 bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-xl"><h2 className="text-2xl font-bold mb-4 dark:text-white">Reset Password</h2><p className="mb-4 text-gray-500">Enter your new password below.</p>{/* Reset Logic Here */}<button onClick={() => setResetMode(false)} className="text-indigo-600 font-bold">Cancel</button></div></div>;
+
   if (!user) return <AuthScreen onLogin={handleLogin} />;
 
   const income = transactions.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);

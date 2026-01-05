@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { UserProfile, Transaction, CurrencyCode } from '../types';
 
@@ -129,9 +130,9 @@ export const sbSignup = async (
 export const sbResetPassword = async (email: string): Promise<{ success: boolean; error: string | null }> => {
     if (!isConfigured()) return { success: false, error: "Database keys invalid." };
     
-    // Explicitly grab the origin (e.g., https://your-app.vercel.app)
-    // NOTE: This URL MUST be added to "Redirect URLs" in Supabase Dashboard -> Auth -> URL Configuration
-    const redirectUrl = window.location.origin;
+    // Explicitly append /#reset-password to ensure the app detects the route on return
+    // e.g. https://your-app.vercel.app/#reset-password
+    const redirectUrl = `${window.location.origin}/#reset-password`;
 
     console.log("🔒 requesting password reset redirect to:", redirectUrl);
 
