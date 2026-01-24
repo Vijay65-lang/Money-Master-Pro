@@ -1,13 +1,59 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Home, Wallet, TrendingUp, Grid, Plus, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Bot, X, Settings, LogOut, User as UserIcon, Lock, ChevronRight, Globe, Moon, Sun, Edit2, LayoutDashboard, Eye, EyeOff, ShieldAlert, Cloud, Server, Database, AlertCircle, CheckCircle2, Mail, KeyRound, BarChart3, ExternalLink, MessageCircle, HelpCircle, Loader2, Download, RefreshCw, Zap, List, FileText, UserCog, Save, Tag } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { Home, Wallet, TrendingUp, Grid, Plus, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Bot, X, Settings, LogOut, User as UserIcon, Lock, ChevronRight, Globe, Moon, Sun, Edit2, LayoutDashboard, Eye, EyeOff, ShieldAlert, Cloud, Server, Database, AlertCircle, CheckCircle2, Mail, KeyRound, BarChart3, ExternalLink, MessageCircle, HelpCircle, Loader2, Download, RefreshCw, Zap, List, FileText, UserCog, Save, Tag, Search, Calendar, Trophy, Sparkles, ChevronLeft, ArrowUp, ArrowLeft, History, FileDown, ShieldCheck } from 'lucide-react';
 import { Transaction, TransactionType, ViewState, Category, UserProfile, CurrencyCode, CURRENCY_SYMBOLS, Theme } from './types';
 import { Investments } from './components/Investments';
 import { Tools } from './components/Tools';
-import { ResetPasswordPage } from './components/ResetPasswordPage'; // NEW IMPORT
+import { ResetPasswordPage } from './components/ResetPasswordPage';
 import { getFinancialAdvice } from './services/geminiService';
 import { sbLogin, sbSignup, sbLogout, sbSaveTransaction, sbLoadTransactions, sbDeleteTransaction, sbUpdateProfile, sbResetPassword, sbUpdateUserPassword, sbGetOrCreateProfile, supabase } from './services/supabaseService';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts';
+
+// --- ANIMATION COMPONENTS ---
+
+const AnimatedNumber = ({ value, currency, privacyMode, precision = 0 }: { value: number, currency: CurrencyCode, privacyMode: boolean, precision?: number }) => {
+    const [displayValue, setDisplayValue] = useState(0);
+    
+    useEffect(() => {
+        let start = displayValue;
+        const end = value;
+        const duration = 800;
+        let startTimestamp: number | null = null;
+
+        const step = (timestamp: number) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            const easeOutQuad = (t: number) => t * (2 - t);
+            const current = start + (end - start) * easeOutQuad(progress);
+            setDisplayValue(current);
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            }
+        };
+
+        window.requestAnimationFrame(step);
+    }, [value, privacyMode]);
+
+    if (privacyMode) return <span>••••</span>;
+    const symbol = CURRENCY_SYMBOLS[currency] || currency;
+    return <span>{symbol}{displayValue.toLocaleString(undefined, { minimumFractionDigits: precision, maximumFractionDigits: precision })}</span>;
+};
+
+const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 'error' | 'info', onClose: () => void }) => {
+    useEffect(() => {
+        const timer = setTimeout(onClose, 3000);
+        return () => clearTimeout(timer);
+    }, [onClose]);
+
+    const bg = type === 'success' ? 'bg-emerald-500' : type === 'error' ? 'bg-rose-500' : 'bg-indigo-600';
+    
+    return (
+        <div className={`fixed top-6 right-6 z-[100] ${bg} text-white px-6 py-4 rounded-2xl shadow-2xl animate-slide-down flex items-center gap-3 font-bold`}>
+            {type === 'success' ? <CheckCircle2 size={20} /> : type === 'error' ? <AlertCircle size={20} /> : <Sparkles size={20} />}
+            {message}
+        </div>
+    );
+};
 
 // --- CONSTANTS & HELPERS ---
 const COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6', '#84cc16', '#06b6d4', '#d946ef', '#f97316'];
@@ -25,28 +71,23 @@ const EXPENSE_CATEGORIES = [
     Category.TAXES, Category.CHARITY, Category.OTHERS
 ];
 
-const formatCurrency = (amount: number, code: CurrencyCode, privacyMode: boolean = false) => {
-  if (privacyMode) return '••••';
-  const symbol = CURRENCY_SYMBOLS[code] || code;
-  return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-};
-
 // --- COMPONENTS ---
 
-// 1. Futuristic Card Component
-const GlassCard = ({ children, className = "" }: { children?: React.ReactNode, className?: string }) => (
-    <div className={`bg-white/80 dark:bg-gray-900/60 backdrop-blur-xl border border-white/20 dark:border-gray-700/50 shadow-xl rounded-[2rem] ${className}`}>
+const GlassCard = ({ children, className = "", delay = 0 }: { children?: React.ReactNode, className?: string, delay?: number }) => (
+    <div 
+        style={{ animationDelay: `${delay}ms` }}
+        className={`glass-morphism shadow-xl rounded-[2.5rem] card-hover animate-slide-up opacity-0 ${className}`}
+    >
         {children}
     </div>
 );
 
-// 2. Stat Card
-const StatCard = ({ title, amount, type, currency, privacyMode, subtitle }: { title: string, amount: number, type: 'neutral' | 'success' | 'danger', currency: CurrencyCode, privacyMode: boolean, subtitle?: React.ReactNode }) => {
+const StatCard = ({ title, amount, type, currency, privacyMode, subtitle, delay = 0 }: { title: string, amount: number, type: 'neutral' | 'success' | 'danger', currency: CurrencyCode, privacyMode: boolean, subtitle?: React.ReactNode, delay?: number }) => {
   const getGradient = () => {
       switch(type) {
-          case 'success': return 'from-emerald-500/20 to-teal-500/5 border-emerald-500/20';
-          case 'danger': return 'from-rose-500/20 to-orange-500/5 border-rose-500/20';
-          default: return 'from-indigo-500/20 to-purple-500/5 border-indigo-500/20';
+          case 'success': return 'from-emerald-500/10 to-teal-500/5 border-emerald-500/10 dark:from-emerald-500/20';
+          case 'danger': return 'from-rose-500/10 to-orange-500/5 border-rose-500/10 dark:from-rose-500/20';
+          default: return 'from-indigo-500/10 to-purple-500/5 border-indigo-500/10 dark:from-indigo-500/20';
       }
   };
   const getIconColor = () => {
@@ -58,485 +99,92 @@ const StatCard = ({ title, amount, type, currency, privacyMode, subtitle }: { ti
   };
 
   return (
-    <GlassCard className={`p-6 relative overflow-hidden group transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl bg-gradient-to-br ${getGradient()}`}>
-      <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:scale-110 duration-500 ${getIconColor()}`}>
-          {type === 'success' ? <TrendingUp size={80} /> : type === 'danger' ? <TrendingUp size={80} className="rotate-180"/> : <Wallet size={80}/>}
+    <GlassCard delay={delay} className={`p-6 relative overflow-hidden group bg-gradient-to-br ${getGradient()}`}>
+      <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-all transform group-hover:scale-125 duration-700 ${getIconColor()}`}>
+          {type === 'success' ? <TrendingUp size={100} /> : type === 'danger' ? <TrendingUp size={100} className="rotate-180"/> : <Wallet size={100}/>}
       </div>
       <div className="relative z-10">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">{title}</p>
-          <h3 className={`text-3xl md:text-4xl font-black ${type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : type === 'danger' ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white'}`}>
-            {formatCurrency(amount, currency, privacyMode)}
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-2">{title}</p>
+          <h3 className={`text-4xl font-black tracking-tight ${type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : type === 'danger' ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white'}`}>
+            <AnimatedNumber value={amount} currency={currency} privacyMode={privacyMode} precision={0} />
           </h3>
-          {subtitle && <div className="mt-3">{subtitle}</div>}
+          {subtitle && <div className="mt-4">{subtitle}</div>}
       </div>
     </GlassCard>
   );
 };
 
-// 3. Navigation Button
 const NavButton = ({ active, onClick, icon: Icon, label, desktop }: any) => (
   <button 
     onClick={onClick}
-    className={`flex items-center gap-3 w-full p-4 rounded-2xl transition-all duration-300 group relative overflow-hidden ${
+    className={`flex items-center gap-4 w-full p-4 rounded-2xl transition-all duration-300 group relative overflow-hidden active:scale-95 ${
       desktop 
-        ? (active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white') 
-        : (active ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-600')
+        ? (active ? 'bg-brand-600 text-white shadow-xl shadow-brand-500/30' : 'text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800 hover:shadow-lg hover:text-gray-900 dark:hover:text-white') 
+        : (active ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400 dark:text-gray-600')
     }`}
   >
-    {desktop && active && <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent pointer-events-none" />}
-    <Icon size={desktop ? 20 : 24} strokeWidth={active ? 2.5 : 2} className={`transition-transform duration-300 ${active && desktop ? 'scale-110' : 'group-hover:scale-110'}`} />
-    <span className={`${desktop ? 'text-sm font-bold tracking-wide' : 'hidden'}`}>{label}</span>
+    {desktop && active && <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent pointer-events-none" />}
+    <Icon size={desktop ? 22 : 26} strokeWidth={active ? 3 : 2} className={`transition-all duration-500 ${active && desktop ? 'scale-110 drop-shadow-md' : 'group-hover:scale-125'}`} />
+    <span className={`${desktop ? 'text-sm font-black tracking-tight' : 'hidden'}`}>{label}</span>
   </button>
 );
 
-// 4. Sidebar
-const Sidebar = ({ view, setView, handleLogout, user, isMobile }: any) => (
-    <div className={`${isMobile ? 'flex w-full' : 'hidden md:flex w-72 sticky top-0 z-40 bg-white/50 dark:bg-gray-950/50 backdrop-blur-xl border-r border-gray-200 dark:border-gray-800'} flex-col h-full p-6`}>
-        <div className="flex items-center gap-3 px-2 mb-10 mt-2">
-            <div className="bg-gradient-to-br from-indigo-600 to-violet-600 p-3 rounded-2xl text-white shadow-lg shadow-indigo-500/30">
-                <Wallet size={24} fill="currentColor" fillOpacity={0.2} />
-            </div>
-            <div>
-                <h1 className="text-xl font-black text-gray-900 dark:text-white leading-none tracking-tight">MONEY</h1>
-                <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600 leading-none tracking-tight">MASTER PRO</h1>
-            </div>
-        </div>
-
-        <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar pr-2">
-            <p className="px-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">Main Menu</p>
-            <NavButton desktop active={view === ViewState.HOME} onClick={() => setView(ViewState.HOME)} icon={LayoutDashboard} label="Dashboard" />
-            <NavButton desktop active={view === ViewState.EXPENSES} onClick={() => setView(ViewState.EXPENSES)} icon={PieChart} label="Expenses" />
-            <NavButton desktop active={view === ViewState.INCOME} onClick={() => setView(ViewState.INCOME)} icon={TrendingUp} label="Income" />
-            <NavButton desktop active={view === ViewState.INVESTMENTS} onClick={() => setView(ViewState.INVESTMENTS)} icon={BarChart3} label="Investments" />
-            <NavButton desktop active={view === ViewState.TOOLS} onClick={() => setView(ViewState.TOOLS)} icon={Grid} label="Power Tools" />
-            
-            <div className="my-6 border-t border-gray-200 dark:border-gray-800"></div>
-            
-            <p className="px-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">System</p>
-            <NavButton desktop active={view === ViewState.PROFILE} onClick={() => setView(ViewState.PROFILE)} icon={Settings} label="Settings" />
-        </div>
-
-        <div className="mt-auto pt-6 border-t border-gray-200 dark:border-gray-800">
-             <div className="flex items-center gap-3 px-3 py-3 mb-3 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                 <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-md flex items-center justify-center text-white font-bold text-sm">
-                     {user.name.charAt(0)}
-                 </div>
-                 <div className="flex-1 overflow-hidden">
-                     <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{user.name}</p>
-                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${user.cloudConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-gray-400'}`}></span>
-                        {user.cloudConnected ? 'Online' : 'Offline'}
-                     </p>
-                 </div>
-             </div>
-             <button onClick={handleLogout} className="flex items-center justify-center gap-2 text-xs font-bold text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 w-full p-3 rounded-xl transition-all uppercase tracking-wide">
-                <LogOut size={16} /> Disconnect
-             </button>
-        </div>
-    </div>
-);
-
-// 5. Auth Screen
-const AuthScreen = ({ onLogin }: { onLogin: (p: UserProfile) => Promise<void> | void }) => {
-    const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [name, setName] = useState('');
-    const [currency, setCurrency] = useState<CurrencyCode>('USD');
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState('');
-    const [successMsg, setSuccessMsg] = useState('');
-    const [loading, setLoading] = useState(false);
-
-    const handleAuth = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError(''); setSuccessMsg(''); setLoading(true);
-        const cleanEmail = email.trim().toLowerCase();
-        
-        try {
-            if (mode === 'forgot') {
-                const { success, error } = await sbResetPassword(cleanEmail);
-                setLoading(false);
-                if (success) setSuccessMsg("Reset link sent! Check your email."); else setError(error || "Failed.");
-                return;
-            }
-
-            if (mode === 'login') {
-                const { user, error } = await sbLogin(cleanEmail, password);
-                if (error) {
-                    setLoading(false);
-                    setError(error);
-                } else if (user) {
-                    // Pass to App to handle loading data
-                    await onLogin(user);
-                    // Loading state is managed by App now, but just in case:
-                    setLoading(false);
-                }
-            } else {
-                const { success, error, msg } = await sbSignup(cleanEmail, password, name, currency);
-                setLoading(false);
-                if (error) setError(error); else if (success) {
-                    if (msg) { setSuccessMsg(msg); setMode('login'); setPassword(''); } else { 
-                        // Auto login after signup
-                        const { user } = await sbLogin(cleanEmail, password); 
-                        if(user) await onLogin(user); 
-                    }
-                }
-            }
-        } catch (e) {
-            setLoading(false);
-            setError("An unexpected error occurred.");
-        }
-    };
-
+const MonthSelector = ({ selectedDate, onDateChange }: { selectedDate: Date, onDateChange: (d: Date) => void }) => {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    
     return (
-        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[120px]"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 rounded-full blur-[120px]"></div>
-            </div>
-
-            <div className="bg-white/5 backdrop-blur-2xl border border-white/10 w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl animate-slide-up relative z-10">
-                <div className="flex justify-center mb-8">
-                    <div className="bg-gradient-to-tr from-indigo-500 to-purple-600 p-5 rounded-2xl shadow-[0_0_20px_rgba(99,102,241,0.5)]">
-                        <Wallet size={40} className="text-white" />
-                    </div>
-                </div>
-                <h2 className="text-4xl font-black text-center mb-2 text-white tracking-tight">Money Master Pro</h2>
-                <p className="text-center text-indigo-200 mb-8 font-medium">Next Gen Financial Management</p>
-                
-                {mode !== 'forgot' && (
-                    <div className="flex p-1.5 bg-black/20 rounded-2xl mb-6 backdrop-blur-md">
-                        <button onClick={() => setMode('login')} className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${mode === 'login' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>LOG IN</button>
-                        <button onClick={() => setMode('signup')} className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${mode === 'signup' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>SIGN UP</button>
-                    </div>
-                )}
-
-                {successMsg ? (
-                    <div className="bg-emerald-500/20 border border-emerald-500/30 p-6 rounded-2xl text-center">
-                         <Mail className="mx-auto mb-4 text-emerald-400" size={32} />
-                         <p className="text-emerald-200 font-bold mb-4">{successMsg}</p>
-                         <button onClick={() => { setSuccessMsg(''); setMode('login'); }} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition-all">Back to Login</button>
-                    </div>
-                ) : (
-                    <form onSubmit={handleAuth} className="space-y-4">
-                        {mode === 'signup' && (
-                            <input className="w-full bg-black/30 border border-white/10 focus:border-indigo-500 rounded-xl p-4 font-bold outline-none text-white placeholder-gray-500 transition-all" value={name} onChange={e => setName(e.target.value)} required placeholder="Full Name" />
-                        )}
-                        <input type="email" className="w-full bg-black/30 border border-white/10 focus:border-indigo-500 rounded-xl p-4 font-bold outline-none text-white placeholder-gray-500 transition-all" value={email} onChange={e => setEmail(e.target.value)} required placeholder="Email Address" />
-                        
-                        {mode !== 'forgot' && (
-                            <div className="relative">
-                                <input type={showPassword ? "text" : "password"} className="w-full bg-black/30 border border-white/10 focus:border-indigo-500 rounded-xl p-4 font-bold outline-none text-white placeholder-gray-500 transition-all" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Password" />
-                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-4 text-gray-500 hover:text-white">{showPassword ? <EyeOff size={20}/> : <Eye size={20}/>}</button>
-                            </div>
-                        )}
-                        {mode === 'login' && <div className="flex justify-end"><button type="button" onClick={() => setMode('forgot')} className="text-xs font-bold text-indigo-400 hover:text-indigo-300">Forgot Password?</button></div>}
-
-                        {mode === 'signup' && (
-                            <select value={currency} onChange={e => setCurrency(e.target.value as CurrencyCode)} className="w-full bg-black/30 border border-white/10 focus:border-indigo-500 rounded-xl p-4 font-bold outline-none text-white transition-all cursor-pointer">
-                                {Object.keys(CURRENCY_SYMBOLS).map(c => <option key={c} value={c} className="bg-gray-900">{c} ({CURRENCY_SYMBOLS[c as CurrencyCode]})</option>)}
-                            </select>
-                        )}
-
-                        <button disabled={loading} type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 rounded-xl shadow-[0_0_20px_rgba(99,102,241,0.3)] mt-4 flex items-center justify-center gap-2 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
-                            {loading ? <Loader2 className="animate-spin" /> : (mode === 'forgot' ? "SEND RESET LINK" : (mode === 'login' ? "ACCESS ACCOUNT" : "CREATE PROFILE"))}
-                        </button>
-                        {mode === 'forgot' && <button type="button" onClick={() => setMode('login')} className="w-full text-gray-400 font-bold py-3 text-sm hover:text-white">Back to Login</button>}
-                    </form>
-                )}
-                {error && <div className="mt-4 p-4 bg-red-500/20 border border-red-500/30 text-red-200 font-bold rounded-xl text-sm flex items-center gap-2"><AlertCircle size={18} className="shrink-0"/> {error}</div>}
-            </div>
+        <div className="flex items-center gap-2 p-1.5 glass-morphism rounded-2xl overflow-x-auto no-scrollbar max-w-full">
+            {months.map((m, idx) => {
+                const isActive = selectedDate.getMonth() === idx;
+                return (
+                    <button 
+                        key={m}
+                        onClick={() => onDateChange(new Date(selectedDate.getFullYear(), idx, 1))}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap active:scale-95 ${isActive ? 'bg-brand-600 text-white shadow-lg' : 'text-gray-500 hover:bg-white dark:hover:bg-gray-800'}`}
+                    >
+                        {m}
+                    </button>
+                );
+            })}
         </div>
     );
 };
 
-// 6. Dashboard & Content
-const DashboardContent = ({ view, user, transactions, balance, income, expense, onAddTx, onDeleteTx, onOpenAi }: any) => {
-    const [title, setTitle] = useState('');
-    const [amount, setAmount] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState<string>('');
-    const [loadingCat, setLoadingCat] = useState(false);
+const GoalCard = ({ income, expense, currency, privacyMode }: any) => {
+    const savings = income - expense;
+    const goal = income * 0.2; // 20% savings goal
+    const progress = Math.min(100, Math.max(0, (savings / (goal || 1)) * 100));
     
-    // Determine categories based on view
-    const availableCategories = view === ViewState.INCOME ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-
-    // Set default category when view changes
-    useEffect(() => {
-        setSelectedCategory(availableCategories[0]);
-    }, [view]);
-
-    // Filter transactions
-    const displayTxs = view === ViewState.HOME 
-        ? transactions.slice(0, 5) 
-        : transactions.filter((t: Transaction) => t.type === (view === ViewState.INCOME ? TransactionType.INCOME : TransactionType.EXPENSE));
-    
-    // Chart Data Preparation
-    const getChartData = (type: TransactionType) => {
-        const relevantTxs = transactions.filter((t: Transaction) => t.type === type);
-        const map = new Map<string, number>();
-        relevantTxs.forEach((t: Transaction) => {
-            const current = map.get(t.category as string) || 0;
-            map.set(t.category as string, current + t.amount);
-        });
-        return Array.from(map).map(([name, value]) => ({ name, value }));
-    };
-
-    const incomeData = getChartData(TransactionType.INCOME);
-    const expenseData = getChartData(TransactionType.EXPENSE);
-    const activeChartData = view === ViewState.INCOME ? incomeData : expenseData;
-    
-    // Dashboard Specific Data (Summary)
-    const dashboardChartData = [
-        { name: 'Income', value: income, fill: '#10b981' },
-        { name: 'Expenses', value: expense, fill: '#ef4444' },
-    ];
-    
-    // Percentage Calculation (Savings Rate)
-    const savingsRate = income > 0 ? Math.max(0, ((income - expense) / income) * 100) : 0;
-
-    const handleAdd = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if(!title || !amount) return;
-        setLoadingCat(true);
-        const type = view === ViewState.INCOME ? TransactionType.INCOME : TransactionType.EXPENSE;
-        
-        // Instant add - no AI wait
-        await onAddTx(title, parseFloat(amount), type, selectedCategory);
-        
-        setTitle('');
-        setAmount('');
-        setLoadingCat(false);
-    };
-
     return (
-        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in pb-32">
-             {view === ViewState.HOME && (
-                <>
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-                    <div>
-                        <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tight">Dashboard</h2>
-                        <p className="text-gray-500 dark:text-gray-400 font-medium mt-1">Real-time financial overview</p>
-                    </div>
+        <GlassCard className="p-6 bg-gradient-to-br from-brand-600 to-violet-700 text-white border-none" delay={300}>
+            <div className="flex justify-between items-start mb-6">
+                <div>
+                    <h4 className="text-xl font-black tracking-tight flex items-center gap-2">
+                        <Trophy size={20} className="text-brand-200" /> Savings Target
+                    </h4>
+                    <p className="text-xs text-brand-100 font-bold opacity-80 uppercase tracking-widest mt-1">Target: 20% of Income</p>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <StatCard 
-                        title="Total Balance" 
-                        amount={balance} 
-                        type="neutral" 
-                        currency={user.currency} 
-                        privacyMode={user.privacyMode} 
-                        subtitle={
-                            <div className="mt-2">
-                                <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">
-                                    <span>Savings Rate</span>
-                                    <span>{savingsRate.toFixed(1)}%</span>
-                                </div>
-                                <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                    <div className="h-full bg-indigo-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, savingsRate)}%` }}></div>
-                                </div>
-                            </div>
-                        }
-                    />
-                    <StatCard title="Total Income" amount={income} type="success" currency={user.currency} privacyMode={user.privacyMode} />
-                    <StatCard title="Total Expenses" amount={expense} type="danger" currency={user.currency} privacyMode={user.privacyMode} />
+                <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
+                    <Sparkles size={20} className="text-brand-100 animate-pulse-slow" />
                 </div>
-
-                {/* DASHBOARD BAR CHART - INCOME VS EXPENSE */}
-                <GlassCard className="p-6 md:p-8 min-h-[350px]">
-                    <h3 className="text-xl font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                        <BarChart3 className="text-indigo-500" /> Financial Overview
-                    </h3>
-                    <div className="h-[250px] w-full min-w-[200px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={dashboardChartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#374151" opacity={0.2} />
-                                <XAxis type="number" hide />
-                                <YAxis dataKey="name" type="category" width={80} tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                                <Tooltip 
-                                    cursor={{ fill: 'transparent' }}
-                                    contentStyle={{ backgroundColor: '#1f2937', borderRadius: '12px', border: 'none', color: '#fff' }}
-                                    itemStyle={{ color: '#fff', fontWeight: 'bold' }}
-                                    formatter={(val: number) => formatCurrency(val, user.currency, user.privacyMode)}
-                                />
-                                <Bar dataKey="value" barSize={30} radius={[0, 10, 10, 0]}>
-                                    {dashboardChartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </GlassCard>
-                </>
-             )}
-
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                 <div className="lg:col-span-2 space-y-6">
-                     {(view === ViewState.EXPENSES || view === ViewState.INCOME) && (
-                        <>
-                        <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
-                            {view === ViewState.INCOME ? <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-500"><TrendingUp/></div> : <div className="p-2 bg-rose-500/20 rounded-lg text-rose-500"><TrendingUp className="rotate-180"/></div>}
-                            {view === ViewState.INCOME ? 'Income Stream' : 'Expense Tracker'}
-                        </h2>
-                        
-                        {/* CHART SECTION */}
-                        {activeChartData.length > 0 && (
-                            <GlassCard className="p-6 md:p-8 min-h-[300px] flex flex-col md:flex-row items-center justify-around">
-                                <div className="w-full md:w-1/2 h-[250px] relative min-w-[200px]">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <RePieChart>
-                                            <Pie
-                                                data={activeChartData}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                            >
-                                                {activeChartData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="rgba(0,0,0,0)" />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip 
-                                                contentStyle={{ backgroundColor: '#1f2937', borderRadius: '12px', border: 'none', color: '#fff' }}
-                                                itemStyle={{ color: '#fff', fontWeight: 'bold' }}
-                                                formatter={(val: number) => formatCurrency(val, user.currency, user.privacyMode)}
-                                            />
-                                        </RePieChart>
-                                    </ResponsiveContainer>
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-                                        <p className="text-xs text-gray-500 font-bold uppercase">Total</p>
-                                        <p className="font-bold text-gray-900 dark:text-white">
-                                            {formatCurrency(activeChartData.reduce((a, b) => a + b.value, 0), user.currency, user.privacyMode)}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="w-full md:w-1/2 grid grid-cols-2 gap-3 mt-4 md:mt-0">
-                                    {activeChartData.map((entry, index) => (
-                                        <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                                            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                                            <div className="overflow-hidden">
-                                                <p className="text-xs font-bold text-gray-500 truncate">{entry.name}</p>
-                                                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
-                                                    {formatCurrency(entry.value, user.currency, user.privacyMode)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </GlassCard>
-                        )}
-
-                        <GlassCard className="p-1">
-                             <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-2 p-2">
-                                <div className="flex-1 flex flex-col md:flex-row gap-2">
-                                     <input 
-                                        value={title} onChange={e=>setTitle(e.target.value)}
-                                        placeholder="Description (e.g. Salary, Rent)" 
-                                        className="flex-1 bg-transparent p-4 font-bold outline-none text-gray-900 dark:text-white placeholder-gray-400 border-b md:border-b-0 md:border-r border-gray-100 dark:border-gray-800"
-                                     />
-                                     <div className="relative md:w-48">
-                                         <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                                         <select 
-                                            value={selectedCategory} 
-                                            onChange={e => setSelectedCategory(e.target.value)}
-                                            className="w-full h-full bg-transparent p-4 pl-10 font-bold outline-none text-gray-500 dark:text-gray-400 cursor-pointer appearance-none"
-                                         >
-                                            {availableCategories.map(c => <option key={c} value={c} className="bg-white dark:bg-gray-900 text-black dark:text-white">{c}</option>)}
-                                         </select>
-                                     </div>
-                                </div>
-
-                                <div className="h-px md:h-auto md:w-px bg-gray-200 dark:bg-gray-700 mx-2 hidden md:block"></div>
-                                
-                                <div className="relative w-full md:w-40">
-                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">{CURRENCY_SYMBOLS[user.currency as CurrencyCode]}</span>
-                                     <input 
-                                        type="number"
-                                        value={amount} onChange={e=>setAmount(e.target.value)}
-                                        placeholder="0.00" 
-                                        className="w-full bg-transparent p-4 pl-10 font-bold outline-none text-gray-900 dark:text-white placeholder-gray-400"
-                                    />
-                                </div>
-                                <button disabled={loadingCat} type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white p-4 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center min-w-[60px]">
-                                    {loadingCat ? <Loader2 className="animate-spin" /> : <Plus />}
-                                </button>
-                             </form>
-                        </GlassCard>
-                        </>
-                     )}
-
-                     <GlassCard className="p-6 md:p-8 min-h-[400px]">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                                {view === ViewState.HOME ? <><Zap className="text-indigo-500"/> Recent Activity</> : <><List className="text-indigo-500"/> Transaction History</>}
-                            </h3>
-                            {view !== ViewState.HOME && <span className="text-xs font-bold bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-500">{displayTxs.length} Records</span>}
-                        </div>
-                        
-                        <div className="space-y-3">
-                            {displayTxs.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-20 opacity-50">
-                                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4"><FileText className="text-gray-400"/></div>
-                                    <p className="font-medium text-gray-500">No transactions recorded yet.</p>
-                                </div>
-                            ) : (
-                                displayTxs.map((t: Transaction) => (
-                                    <div key={t.id} className="flex items-center justify-between p-4 bg-gray-50/50 dark:bg-gray-800/30 hover:bg-white dark:hover:bg-gray-800 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 rounded-2xl group transition-all duration-300">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${t.type === TransactionType.INCOME ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400'}`}>
-                                                {t.type === TransactionType.INCOME ? <ArrowUpCircle size={20}/> : <ArrowDownCircle size={20}/>}
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-gray-900 dark:text-white text-base">{t.title}</p>
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.category} • {new Date(t.date).toLocaleDateString()}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <span className={`font-black text-lg ${t.type === TransactionType.INCOME ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-900 dark:text-white'}`}>
-                                                {t.type === TransactionType.INCOME ? '+' : '-'}
-                                                {formatCurrency(t.amount, user.currency, user.privacyMode)}
-                                            </span>
-                                            <button onClick={() => onDeleteTx(t.id)} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0">
-                                                <Trash2 size={16}/>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                     </GlassCard>
-                 </div>
-
-                 {/* Widgets Column */}
-                 <div className="space-y-6">
-                    {view === ViewState.HOME && (
-                        <div onClick={onOpenAi} className="bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 p-8 rounded-[2.5rem] text-white relative overflow-hidden shadow-2xl cursor-pointer group hover:shadow-indigo-500/20 transition-all border border-white/10">
-                            <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/30 rounded-full blur-[60px] -mr-10 -mt-10 group-hover:bg-indigo-500/40 transition-all"></div>
-                            <div className="relative z-10">
-                                <div className="bg-white/10 w-fit p-3 rounded-2xl backdrop-blur-md mb-4 border border-white/10 group-hover:scale-110 transition-transform duration-300">
-                                    <Bot className="text-indigo-300" size={32}/>
-                                </div>
-                                <h3 className="text-2xl font-black mb-2 tracking-tight">AI Financial Brain</h3>
-                                <p className="text-indigo-200 mb-6 leading-relaxed font-medium">
-                                    {balance > 0 ? "You're in the green! Tap to analyze your surplus strategy." : "High spending detected. Tap to get a reduction plan."}
-                                </p>
-                                <div className="flex items-center gap-3">
-                                    <span className="flex h-3 w-3 relative">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                                    </span>
-                                    <span className="text-[10px] uppercase tracking-widest font-bold text-emerald-300">System Online</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                 </div>
-             </div>
-        </div>
+            </div>
+            
+            <div className="mb-4">
+                <div className="flex justify-between items-end mb-2">
+                    <p className="text-3xl font-black">
+                        <AnimatedNumber value={savings} currency={currency} privacyMode={privacyMode} />
+                    </p>
+                    <p className="text-sm font-bold text-brand-100">{progress.toFixed(0)}% Done</p>
+                </div>
+                <div className="h-3 w-full bg-black/20 rounded-full overflow-hidden border border-white/10 p-0.5">
+                    <div className="h-full bg-gradient-to-r from-brand-300 to-white rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ width: `${progress}%` }}></div>
+                </div>
+            </div>
+            
+            <p className="text-xs font-medium text-brand-50 italic">
+                {progress >= 100 ? "Amazing! You've exceeded your goal. 🚀" : progress >= 50 ? "Over halfway there! Keep pushing. 💪" : "Start saving early to hit your mark. 🎯"}
+            </p>
+        </GlassCard>
     );
 };
 
@@ -549,6 +197,11 @@ const App = () => {
   const [resetMode, setResetMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAiChat, setShowAiChat] = useState(false);
+  const [showAddTxModal, setShowAddTxModal] = useState(false);
+  const [toast, setToast] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  
   const userRef = useRef<UserProfile | null>(null);
 
   // AI Chat State
@@ -557,11 +210,13 @@ const App = () => {
   const [chatLoading, setChatLoading] = useState(false);
   
   // Settings State
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [editName, setEditName] = useState("");
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   useEffect(() => { userRef.current = user; }, [user]);
+
+  const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
+      setToast({ msg, type });
+  };
 
   const handleLogin = async (loggedInUser: UserProfile) => {
       setLoading(true);
@@ -570,31 +225,28 @@ const App = () => {
           setEditName(loggedInUser.name);
           const txs = await sbLoadTransactions(loggedInUser.id);
           setTransactions(txs);
+          showToast(`Welcome back, ${loggedInUser.name}!`, 'success');
       } catch (e) {
           console.error("Login Data Load Error", e);
+          showToast("Failed to load your data.", 'error');
       } finally {
           setLoading(false);
       }
   };
 
+  const handleLogout = async () => {
+      await sbLogout();
+      setUser(null);
+      setTransactions([]);
+      setView(ViewState.HOME);
+      showToast("Logged out successfully.", 'info');
+  };
+
   useEffect(() => {
-    // 1. Force check immediately on mount - PRIORITIZE RESET MODE
-    const checkHash = () => {
-        const hash = window.location.hash;
-        if (hash && (hash.includes('type=recovery') || hash.includes('reset-password'))) {
-            setResetMode(true);
-            setLoading(false);
-        }
-    };
-    checkHash();
-
-    const timer = setTimeout(() => setLoading(false), 5000);
-
     const initAuth = async () => {
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            // 2. Only auto-login if NOT in recovery mode
-            if (session?.user && !window.location.hash.includes('reset-password') && !window.location.hash.includes('type=recovery')) {
+            if (session?.user && !window.location.hash.includes('reset-password')) {
                const profile = await sbGetOrCreateProfile(session.user);
                if (profile) { 
                    setUser(profile); 
@@ -604,358 +256,429 @@ const App = () => {
                }
             }
         } catch(e) { console.error("Init Auth Error", e); }
-        finally { 
-             // Only turn off loading if NOT in reset mode (which manages its own state)
-             if (!window.location.hash.includes('reset-password') && !window.location.hash.includes('type=recovery')) setLoading(false); 
-        }
+        finally { setLoading(false); }
     };
     initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        const hash = window.location.hash;
-        
-        // 3. Robust Event Handling - LOCK RESET MODE
-        if (event === 'PASSWORD_RECOVERY' || hash.includes('reset-password') || hash.includes('type=recovery')) {
-            setResetMode(true);
-            setLoading(false);
-            // Force URL update to what the user wants if it's a raw recovery link
-            if (!hash.includes('reset-password')) {
-                window.location.hash = 'reset-password';
-            }
-            return;
-        } 
-        
-        if (event === 'SIGNED_IN' && session?.user) {
-             // Double check to prevent race condition where SIGNED_IN fires during recovery
-             // If URL contains reset-password, DO NOT LOAD DASHBOARD
-             if (!resetMode && !hash.includes('reset-password') && !hash.includes('type=recovery')) {
-                if (userRef.current?.id !== session.user.id) {
-                    setLoading(true);
-                    try {
-                        const profile = await sbGetOrCreateProfile(session.user);
-                        if (profile) { 
-                            setUser(profile); 
-                            setEditName(profile.name);
-                            const txs = await sbLoadTransactions(profile.id); 
-                            setTransactions(txs); 
-                        }
-                    } catch(e) { console.error("Auth Change Error", e); }
-                    finally { setLoading(false); }
-                }
-             } else {
-                 // We are signed in but meant to be resetting password
-                 setResetMode(true);
-                 setLoading(false);
-             }
-        } else if (event === 'SIGNED_OUT') { 
-            setUser(null); 
-            setTransactions([]); 
-            setView(ViewState.HOME); 
-            setLoading(false);
-        }
-    });
-    return () => {
-        subscription.unsubscribe();
-        clearTimeout(timer);
-    };
   }, []);
 
   useEffect(() => {
      if(user?.theme === 'dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark');
   }, [user?.theme]);
 
-  const handleLogout = async () => { await sbLogout(); };
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+        const tDate = new Date(t.date);
+        const matchesDate = tDate.getMonth() === selectedDate.getMonth() && tDate.getFullYear() === selectedDate.getFullYear();
+        const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                             t.category.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesDate && matchesSearch;
+    });
+  }, [transactions, selectedDate, searchQuery]);
 
-  const handleUpdateProfile = async () => {
-      if (!user) return;
-      const updatedUser = { ...user, name: editName };
-      setUser(updatedUser);
-      setIsEditingProfile(false);
-      await sbUpdateProfile(user.id, updatedUser);
-  };
+  const income = useMemo(() => filteredTransactions.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0), [filteredTransactions]);
+  const expense = useMemo(() => filteredTransactions.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0), [filteredTransactions]);
+  const balance = income - expense;
 
   const handleAddTx = async (title: string, amount: number, type: TransactionType, selectedCategory: string) => {
      if(!user) return;
-     let category = selectedCategory;
-     if (!category) { category = Category.OTHERS; }
-
-     const newTx: Transaction = { id: crypto.randomUUID(), title, amount, type, category: category as Category, date: new Date().toISOString() };
-     const updated = [newTx, ...transactions];
-     setTransactions(updated);
+     const newTx: Transaction = { id: crypto.randomUUID(), title, amount, type, category: selectedCategory as Category, date: new Date().toISOString() };
+     
+     // Optimistic UI update
+     const updatedTxs = [newTx, ...transactions];
+     setTransactions(updatedTxs);
+     
+     // Background sync
      await sbSaveTransaction(user.id, newTx);
+     showToast("Transaction added successfully!", 'success');
+     setShowAddTxModal(false);
   };
 
   const handleDeleteTx = async (id: string) => {
-      const updated = transactions.filter(t => t.id !== id);
-      setTransactions(updated);
+      setTransactions(transactions.filter(t => t.id !== id));
       await sbDeleteTransaction(id);
-  };
-  
-  const handleClearData = async () => {
-      if(!user) return;
-      setTransactions([]);
-      transactions.forEach(t => sbDeleteTransaction(t.id));
-      setDeleteConfirm(false);
+      showToast("Transaction deleted.", 'info');
   };
 
   const handleAskAi = async () => {
     if (!chatQuery || !user) return;
     setChatLoading(true);
-    const context = `User: ${user.name}, Currency: ${user.currency}. Total Balance: ${transactions.reduce((acc, t) => t.type === TransactionType.INCOME ? acc + t.amount : acc - t.amount, 0)}. Recent Txs: ${JSON.stringify(transactions.slice(0, 5))}`;
+    const context = `User: ${user.name}, Balance: ${balance}. Month: ${selectedDate.toLocaleString('default', { month: 'long' })}. Txs: ${JSON.stringify(filteredTransactions.slice(0, 5))}`;
     const response = await getFinancialAdvice(chatQuery, context);
     setChatResponse(response);
     setChatLoading(false);
   };
 
-  // RENDER LOGIC: Reset Password takes highest priority
-  if (resetMode) return <ResetPasswordPage onCancel={() => { setResetMode(false); window.location.hash = ''; }} />;
-
   if (loading) return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center gap-4">
-          <Loader2 className="animate-spin text-indigo-600" size={40} />
-          <p className="text-gray-500 font-bold animate-pulse">Loading System...</p>
-          <button onClick={() => setLoading(false)} className="mt-4 text-xs font-bold text-indigo-500 hover:text-indigo-600 underline cursor-pointer">
-              Taking too long? Click here
-          </button>
+      <div className="min-h-screen bg-[#f8faff] dark:bg-gray-950 flex flex-col items-center justify-center gap-6">
+          <div className="relative">
+              <div className="w-16 h-16 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                  <Wallet size={24} className="text-brand-600 animate-pulse" />
+              </div>
+          </div>
+          <div className="text-center">
+              <p className="text-xl font-black text-gray-900 dark:text-white animate-pulse">Initializing Money Master Pro</p>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Loading Cloud Sync...</p>
+          </div>
       </div>
   );
 
   if (!user) return <AuthScreen onLogin={handleLogin} />;
 
-  const income = transactions.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);
-  const expense = transactions.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
-  const balance = income - expense;
-
   return (
-    <div className="flex h-screen bg-[#f8fafc] dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 overflow-hidden font-sans selection:bg-indigo-500/30">
-        <Sidebar view={view} setView={setView} handleLogout={handleLogout} user={user} />
+    <div className="flex h-screen bg-[#fdfdff] dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 overflow-hidden font-sans">
+        {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
         
-        {mobileMenuOpen && (
-             <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm md:hidden" onClick={() => setMobileMenuOpen(false)}>
-                 <div className="w-72 h-full bg-white dark:bg-gray-950 shadow-2xl animate-slide-right" onClick={e => e.stopPropagation()}>
-                      <Sidebar view={view} setView={(v: ViewState) => { setView(v); setMobileMenuOpen(false); }} handleLogout={handleLogout} user={user} isMobile={true} />
-                 </div>
-             </div>
-        )}
-
-        <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-            <div className="md:hidden flex items-center justify-between p-4 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 shrink-0 z-30 sticky top-0">
-                <span className="font-black text-lg flex items-center gap-2 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Money Master Pro</span>
-                <button onClick={() => setMobileMenuOpen(true)} className="p-2 text-gray-600 dark:text-gray-300"><Grid /></button>
+        {/* SIDEBAR */}
+        <div className={`hidden md:flex w-80 sticky top-0 z-40 bg-white/50 dark:bg-gray-950/50 backdrop-blur-3xl border-r border-gray-100 dark:border-gray-800 flex-col h-full p-8 transition-all`}>
+            <div className="flex items-center gap-4 px-2 mb-12 animate-fade-in">
+                <div className="bg-gradient-to-br from-brand-600 to-violet-700 p-4 rounded-3xl text-white shadow-2xl shadow-brand-500/40 animate-scale-up">
+                    <Wallet size={28} fill="currentColor" fillOpacity={0.2} />
+                </div>
+                <div>
+                    <h1 className="text-2xl font-black text-gray-950 dark:text-white leading-none tracking-tighter">MONEY</h1>
+                    <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-violet-700 leading-none tracking-tighter">MASTER</h1>
+                </div>
             </div>
 
-            <main className="flex-1 overflow-y-auto relative custom-scrollbar">
-                {view === ViewState.TOOLS && <Tools currency={user.currency} userId={user.id} privacyMode={user.privacyMode} />}
-                {view === ViewState.INVESTMENTS && <Investments currency={user.currency} privacyMode={user.privacyMode} />}
-                {view === ViewState.PROFILE && (
-                    <div className="p-4 md:p-10 max-w-3xl mx-auto animate-fade-in pb-24">
-                         <h2 className="text-4xl font-black mb-8 dark:text-white">Settings</h2>
+            <nav className="space-y-3 flex-1 overflow-y-auto no-scrollbar">
+                <p className="px-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4">Financial Dashboard</p>
+                <NavButton desktop active={view === ViewState.HOME} onClick={() => setView(ViewState.HOME)} icon={LayoutDashboard} label="Global Overview" />
+                <NavButton desktop active={view === ViewState.EXPENSES} onClick={() => setView(ViewState.EXPENSES)} icon={PieChart} label="Expense Analytics" />
+                <NavButton desktop active={view === ViewState.INCOME} onClick={() => setView(ViewState.INCOME)} icon={TrendingUp} label="Income Streams" />
+                <NavButton desktop active={view === ViewState.INVESTMENTS} onClick={() => setView(ViewState.INVESTMENTS)} icon={BarChart3} label="Wealth Planner" />
+                <NavButton desktop active={view === ViewState.TOOLS} onClick={() => setView(ViewState.TOOLS)} icon={Grid} label="Power Utilities" />
+                
+                <div className="my-8 border-t border-gray-100 dark:border-gray-800 opacity-50"></div>
+                
+                <p className="px-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4">Profile & Sync</p>
+                <NavButton desktop active={view === ViewState.PROFILE} onClick={() => setView(ViewState.PROFILE)} icon={Settings} label="System Settings" />
+            </nav>
 
-                         {/* PROFILE MANAGEMENT SECTION */}
-                         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 ml-2">Profile Details</h3>
-                         <GlassCard className="p-6 mb-8">
-                             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-                                 <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 shadow-xl flex items-center justify-center text-white font-bold text-3xl">
-                                     {user.name.charAt(0)}
-                                 </div>
-                                 <div className="flex-1 w-full space-y-4">
-                                     <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Full Name</label>
-                                        <div className="flex gap-3">
-                                            <input 
-                                                value={editName}
-                                                onChange={(e) => setEditName(e.target.value)}
-                                                className="flex-1 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-indigo-500 rounded-xl p-3 font-bold text-gray-900 dark:text-white outline-none transition-all"
-                                                placeholder="Enter your name"
-                                            />
-                                            <button 
-                                                onClick={handleUpdateProfile}
-                                                disabled={editName === user.name || !editName.trim()}
-                                                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 rounded-xl font-bold transition-colors flex items-center gap-2"
-                                            >
-                                                <Save size={18} /> Save
+            <div className="mt-auto pt-8">
+                 <div className="p-4 bg-gray-50/50 dark:bg-gray-900/50 rounded-3xl border border-gray-100 dark:border-gray-800 transition-all hover:bg-white dark:hover:bg-gray-800 group cursor-default">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-500 to-violet-500 shadow-xl flex items-center justify-center text-white font-black text-lg group-hover:scale-110 transition-transform">
+                            {user.name.charAt(0)}
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                            <p className="text-sm font-black text-gray-950 dark:text-white truncate">{user.name}</p>
+                            <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+                                Online Secure
+                            </p>
+                        </div>
+                    </div>
+                    <button onClick={handleLogout} className="flex items-center justify-center gap-2 text-[10px] font-black text-rose-500 hover:text-white hover:bg-rose-500 w-full py-3 rounded-2xl transition-all uppercase tracking-widest border border-rose-200 dark:border-rose-900/30">
+                        <LogOut size={14} /> Disconnect
+                    </button>
+                 </div>
+            </div>
+        </div>
+
+        {/* MOBILE BOTTOM NAV */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-morphism border-t border-gray-100 dark:border-gray-800 px-6 py-4 flex justify-between items-center rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
+             <NavButton active={view === ViewState.HOME} onClick={() => setView(ViewState.HOME)} icon={LayoutDashboard} />
+             <NavButton active={view === ViewState.EXPENSES} onClick={() => setView(ViewState.EXPENSES)} icon={PieChart} />
+             <button onClick={() => setShowAddTxModal(true)} className="w-16 h-16 bg-brand-600 rounded-full flex items-center justify-center text-white -mt-16 shadow-2xl shadow-brand-500/40 animate-float border-4 border-white dark:border-gray-950 active:scale-90 transition-all">
+                <Plus size={28} />
+             </button>
+             <NavButton active={view === ViewState.TOOLS} onClick={() => setView(ViewState.TOOLS)} icon={Grid} />
+             <NavButton active={view === ViewState.PROFILE} onClick={() => setView(ViewState.PROFILE)} icon={Settings} />
+        </div>
+
+        {/* GLOBAL FLOATING ACTION BUTTON FOR ADDING TX */}
+        <button 
+            onClick={() => setShowAddTxModal(true)}
+            className="fixed bottom-24 md:bottom-28 right-10 z-50 p-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[2rem] shadow-[0_15px_50px_rgba(16,185,129,0.4)] transition-all hover:scale-110 active:scale-90 group hidden md:flex items-center gap-3 overflow-hidden border-2 border-white/20"
+        >
+            <Plus size={28} />
+            <span className="font-black uppercase tracking-widest text-[10px]">Log Entry</span>
+        </button>
+
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <header className="px-8 py-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 glass-morphism z-30 sticky top-0 border-b border-gray-50 dark:border-gray-900">
+                <div>
+                    <h2 className="text-3xl font-black text-gray-950 dark:text-white tracking-tighter">
+                        {view === ViewState.HOME && "Overview"}
+                        {view === ViewState.EXPENSES && "Expenses"}
+                        {view === ViewState.INCOME && "Income"}
+                        {view === ViewState.INVESTMENTS && "Investment Lab"}
+                        {view === ViewState.TOOLS && "Utility Center"}
+                        {view === ViewState.PROFILE && "Settings"}
+                    </h2>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">{selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                    <MonthSelector selectedDate={selectedDate} onDateChange={setSelectedDate} />
+                    <button onClick={() => setShowAddTxModal(true)} className="hidden md:flex items-center gap-2 bg-brand-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all">
+                        <Plus size={18}/> Quick Add
+                    </button>
+                </div>
+            </header>
+
+            <main className="flex-1 overflow-y-auto custom-scrollbar relative bg-[#fdfdff] dark:bg-[#0b0f19]">
+                <div className="p-8 max-w-7xl mx-auto space-y-10 pb-32">
+                    {view === ViewState.HOME && (
+                        <div className="space-y-10 animate-fade-in">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <StatCard delay={100} title="Liquid Wealth" amount={balance} type="neutral" currency={user.currency} privacyMode={user.privacyMode} subtitle={<div className="flex items-center gap-2 text-[10px] font-black text-emerald-500 uppercase tracking-widest"><TrendingUp size={14}/> +4.2% This Month</div>} />
+                                <StatCard delay={200} title="Total Inflow" amount={income} type="success" currency={user.currency} privacyMode={user.privacyMode} />
+                                <StatCard delay={300} title="Total Outflow" amount={expense} type="danger" currency={user.currency} privacyMode={user.privacyMode} />
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                                <div className="lg:col-span-2 space-y-10">
+                                    <GoalCard income={income} expense={expense} currency={user.currency} privacyMode={user.privacyMode} />
+                                    
+                                    <GlassCard className="p-8" delay={400}>
+                                        <div className="flex justify-between items-center mb-8">
+                                            <h3 className="text-xl font-black text-gray-950 dark:text-white tracking-tight flex items-center gap-2">
+                                                <Zap className="text-brand-600" size={20} /> Latest Activity
+                                            </h3>
+                                            <div className="relative">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                                <input 
+                                                    value={searchQuery}
+                                                    onChange={e => setSearchQuery(e.target.value)}
+                                                    placeholder="Search..."
+                                                    className="pl-10 pr-4 py-2 text-xs font-bold glass-morphism rounded-xl outline-none focus:ring-2 ring-brand-500/20 w-40 md:w-60 border-none"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {filteredTransactions.length === 0 ? (
+                                                <div className="py-20 text-center opacity-40">
+                                                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 animate-float"><FileText className="text-gray-400"/></div>
+                                                    <p className="font-bold text-gray-500 uppercase tracking-widest text-[10px]">No Data Found</p>
+                                                </div>
+                                            ) : (
+                                                filteredTransactions.slice(0, 10).map((t, i) => (
+                                                    <div key={t.id} className="flex items-center justify-between p-4 glass-morphism rounded-3xl border-transparent hover:border-brand-500/30 transition-all duration-300 group cursor-default hover:scale-[1.02] shadow-sm" style={{ animationDelay: `${i * 100}ms` }}>
+                                                        <div className="flex items-center gap-4">
+                                                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${t.type === TransactionType.INCOME ? 'bg-emerald-100/50 text-emerald-600 dark:bg-emerald-500/10' : 'bg-rose-100/50 text-rose-600 dark:bg-rose-500/10'}`}>
+                                                                {t.type === TransactionType.INCOME ? <ArrowUpCircle size={24}/> : <ArrowDownCircle size={24}/>}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-black text-gray-950 dark:text-white text-base tracking-tight">{t.title}</p>
+                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t.category} • {new Date(t.date).toLocaleDateString()}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-6">
+                                                            <span className={`font-black text-xl tracking-tighter ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-gray-900 dark:text-white'}`}>
+                                                                {t.type === TransactionType.EXPENSE ? '-' : '+'}<AnimatedNumber value={t.amount} currency={user.currency} privacyMode={user.privacyMode} precision={0} />
+                                                            </span>
+                                                            <button onClick={() => handleDeleteTx(t.id)} className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all opacity-0 group-hover:opacity-100 active:scale-75">
+                                                                <Trash2 size={18}/>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </GlassCard>
+                                </div>
+
+                                <div className="space-y-10">
+                                    <div onClick={() => setShowAiChat(true)} className="bg-gradient-to-br from-indigo-900 via-brand-900 to-slate-900 p-8 rounded-[2.5rem] text-white relative overflow-hidden shadow-2xl cursor-pointer group hover:shadow-brand-500/20 transition-all border border-white/10 card-hover">
+                                        <div className="absolute top-0 right-0 w-60 h-60 bg-brand-500/20 rounded-full blur-[80px] -mr-16 -mt-16 group-hover:bg-brand-500/40 transition-all"></div>
+                                        <div className="relative z-10">
+                                            <div className="bg-white/10 w-fit p-4 rounded-3xl backdrop-blur-md mb-6 border border-white/10 group-hover:scale-110 transition-transform duration-500">
+                                                <Bot className="text-brand-300" size={32}/>
+                                            </div>
+                                            <h3 className="text-3xl font-black mb-3 tracking-tighter">AI Financial Brain</h3>
+                                            <p className="text-brand-100 mb-8 leading-relaxed font-bold opacity-80 text-sm">
+                                                Real-time analysis of your net worth and spending patterns.
+                                            </p>
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex -space-x-3">
+                                                    {[1,2,3].map(i => <div key={i} className={`w-8 h-8 rounded-full border-2 border-indigo-900 bg-brand-${300 + i*100}`} />)}
+                                                </div>
+                                                <span className="text-[10px] uppercase tracking-widest font-black text-brand-300">Live Strategic Advice</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <GlassCard className="p-8" delay={500}>
+                                        <h4 className="text-lg font-black tracking-tight mb-6 flex items-center gap-2"><Sparkles size={18} className="text-brand-600"/> Smart Insights</h4>
+                                        <div className="space-y-6">
+                                            <div className="flex items-start gap-4">
+                                                <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-xl"><CheckCircle2 size={18}/></div>
+                                                <p className="text-xs font-bold text-gray-600 dark:text-gray-400 leading-relaxed">You saved 12% more than last month. You're on track for your retirement goal.</p>
+                                            </div>
+                                            <div className="flex items-start gap-4">
+                                                <div className="p-2 bg-rose-100 dark:bg-rose-900/30 text-rose-600 rounded-xl"><AlertCircle size={18}/></div>
+                                                <p className="text-xs font-bold text-gray-600 dark:text-gray-400 leading-relaxed">Dining out costs increased by $140. Consider setting a weekly limit.</p>
+                                            </div>
+                                        </div>
+                                    </GlassCard>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {view === ViewState.EXPENSES && (
+                        <div className="animate-fade-in space-y-8">
+                            <StatCard title="Total Expenses" amount={expense} type="danger" currency={user.currency} privacyMode={user.privacyMode} />
+                            <TransactionHistoryList transactions={filteredTransactions.filter(t => t.type === TransactionType.EXPENSE)} onDeleteTx={handleDeleteTx} user={user} />
+                        </div>
+                    )}
+                    {view === ViewState.INCOME && (
+                        <div className="animate-fade-in space-y-8">
+                            <StatCard title="Total Income" amount={income} type="success" currency={user.currency} privacyMode={user.privacyMode} />
+                            <TransactionHistoryList transactions={filteredTransactions.filter(t => t.type === TransactionType.INCOME)} onDeleteTx={handleDeleteTx} user={user} />
+                        </div>
+                    )}
+                    {view === ViewState.TOOLS && <Tools currency={user.currency} userId={user.id} privacyMode={user.privacyMode} />}
+                    {view === ViewState.INVESTMENTS && <Investments currency={user.currency} privacyMode={user.privacyMode} />}
+                    {view === ViewState.PROFILE && (
+                        <div className="max-w-4xl mx-auto animate-fade-in space-y-10 pb-20">
+                            <GlassCard className="p-10">
+                                <h3 className="text-2xl font-black mb-8 flex items-center gap-3"><UserCog size={28} className="text-brand-600"/> Master Profile Settings</h3>
+                                <div className="space-y-12">
+                                    <div className="flex flex-col md:flex-row items-center gap-8 p-8 glass-morphism rounded-[2.5rem] border-brand-500/10">
+                                        <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-brand-600 to-violet-600 flex items-center justify-center text-white font-black text-5xl shadow-2xl relative group overflow-hidden">
+                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"><Edit2 size={24}/></div>
+                                            {user.name.charAt(0)}
+                                        </div>
+                                        <div className="flex-1 w-full space-y-6">
+                                            <div>
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 block">Display Identity</label>
+                                                <div className="flex gap-4">
+                                                    <input value={editName} onChange={e => setEditName(e.target.value)} className="bg-transparent text-2xl font-black outline-none w-full border-b-4 border-gray-100 dark:border-gray-800 focus:border-brand-600 transition-all pb-3" />
+                                                    <button onClick={async () => { await sbUpdateProfile(user.id, {...user, name: editName}); setUser({...user, name: editName}); showToast("Identity Updated", "success"); }} className="px-6 py-4 bg-brand-600 text-white rounded-2xl shadow-xl hover:bg-brand-500 active:scale-95 transition-all flex items-center gap-2 font-black text-xs tracking-widest uppercase"><Save size={18}/> Update</button>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div>
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 block">Global Currency</label>
+                                                    <select 
+                                                        value={user.currency} 
+                                                        onChange={async (e) => { 
+                                                            const newCurr = e.target.value as CurrencyCode; 
+                                                            const u = {...user, currency: newCurr}; 
+                                                            setUser(u); 
+                                                            await sbUpdateProfile(user.id, u); 
+                                                            showToast("Currency Refreshed", "info");
+                                                        }}
+                                                        className="w-full bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl font-black outline-none border-2 border-transparent focus:border-brand-500"
+                                                    >
+                                                        {Object.keys(CURRENCY_SYMBOLS).map(c => <option key={c} value={c}>{c} ({CURRENCY_SYMBOLS[c as CurrencyCode]})</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 block">System Theme</label>
+                                                    <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-2xl">
+                                                        <button onClick={async () => { const u = {...user, theme: 'light' as Theme}; setUser(u); await sbUpdateProfile(user.id, u); }} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all ${user.theme === 'light' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-400'}`}><Sun size={18}/> <span className="font-black text-[10px] uppercase">Light</span></button>
+                                                        <button onClick={async () => { const u = {...user, theme: 'dark' as Theme}; setUser(u); await sbUpdateProfile(user.id, u); }} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all ${user.theme === 'dark' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400'}`}><Moon size={18}/> <span className="font-black text-[10px] uppercase">Dark</span></button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="p-8 glass-morphism rounded-[2.5rem] space-y-6">
+                                            <h4 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2"><ShieldCheck size={16}/> Privacy & Security</h4>
+                                            <div className="flex items-center justify-between p-4 bg-gray-50/50 dark:bg-gray-800/50 rounded-2xl">
+                                                <div><p className="font-black text-sm">Privacy Shield</p><p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-1">Mask all financial balances</p></div>
+                                                <button onClick={() => { const u = {...user, privacyMode: !user.privacyMode}; setUser(u); sbUpdateProfile(user.id, u); }} className={`w-14 h-8 rounded-full transition-all relative ${user.privacyMode ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-700'}`}><div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg transition-all ${user.privacyMode ? 'translate-x-6' : ''}`} /></button>
+                                            </div>
+                                            <div className="flex items-center justify-between p-4 bg-gray-50/50 dark:bg-gray-800/50 rounded-2xl opacity-50 cursor-not-allowed">
+                                                <div><p className="font-black text-sm">Biometric Lock</p><p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-1">Require ID on Startup</p></div>
+                                                <button className="w-14 h-8 rounded-full bg-gray-200 dark:bg-gray-900 relative"><div className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-sm"></div></button>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-8 glass-morphism rounded-[2.5rem] space-y-6">
+                                            <h4 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2"><Database size={16}/> Data Lifecycle</h4>
+                                            <button onClick={() => showToast("Exporting data as JSON...", "info")} className="w-full flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-2xl hover:bg-indigo-100 transition-all">
+                                                <div className="flex items-center gap-3"><FileDown size={20}/><span className="font-black text-sm">Export Financial Log</span></div>
+                                                <ChevronRight size={16}/>
+                                            </button>
+                                            <button onClick={() => { if(confirm("Are you ABSOLUTELY sure? This deletes ALL your transaction history forever.")) { setTransactions([]); showToast("All data purged.", "error"); } }} className="w-full flex items-center justify-between p-4 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-2xl hover:bg-rose-100 transition-all group">
+                                                <div className="flex items-center gap-3 group-hover:animate-shake"><Trash2 size={20}/><span className="font-black text-sm">Purge Account Data</span></div>
+                                                <ChevronRight size={16}/>
                                             </button>
                                         </div>
-                                     </div>
-                                     <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Email Address</label>
-                                        <div className="p-3 bg-gray-100 dark:bg-gray-800/50 rounded-xl font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                                            <Mail size={16} /> {user.email}
-                                        </div>
-                                     </div>
-                                 </div>
-                             </div>
-                             <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800 flex justify-end">
-                                 <button onClick={handleLogout} className="text-red-500 hover:text-red-600 font-bold text-sm flex items-center gap-2 px-4 py-2 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors">
-                                     <LogOut size={16} /> Sign Out of Account
-                                 </button>
-                             </div>
-                         </GlassCard>
-                         
-                         {/* APP PREFERENCES */}
-                         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 ml-2">App Preferences</h3>
-                         <GlassCard className="p-2 mb-8 space-y-1">
-                             <div className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-2xl transition-colors">
-                                 <div className="flex items-center gap-4">
-                                     <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl"><EyeOff size={20}/></div>
-                                     <div><p className="font-bold text-gray-900 dark:text-white">Privacy Mode</p><p className="text-xs text-gray-500">Hide balances on dashboard</p></div>
-                                 </div>
-                                 <button onClick={() => { const u = { ...user, privacyMode: !user.privacyMode }; setUser(u); sbUpdateProfile(user.id, u); }} className={`w-14 h-8 rounded-full transition-colors relative ${user.privacyMode ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-700'}`}>
-                                     <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${user.privacyMode ? 'translate-x-6' : ''}`} />
-                                 </button>
-                             </div>
-                             <div className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-2xl transition-colors">
-                                 <div className="flex items-center gap-4">
-                                     <div className="p-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-xl"><Moon size={20}/></div>
-                                     <div><p className="font-bold text-gray-900 dark:text-white">Dark Mode</p><p className="text-xs text-gray-500">Switch between light and dark themes</p></div>
-                                 </div>
-                                 <button onClick={() => { const newTheme: Theme = user.theme === 'light' ? 'dark' : 'light'; const u = { ...user, theme: newTheme }; setUser(u); sbUpdateProfile(user.id, u); }} className={`w-14 h-8 rounded-full transition-colors relative ${user.theme === 'dark' ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-700'}`}>
-                                     <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${user.theme === 'dark' ? 'translate-x-6' : ''}`} />
-                                 </button>
-                             </div>
-                             <div className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-2xl transition-colors">
-                                 <div className="flex items-center gap-4">
-                                     <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl"><Globe size={20}/></div>
-                                     <div><p className="font-bold text-gray-900 dark:text-white">Currency</p><p className="text-xs text-gray-500">Display currency symbol</p></div>
-                                 </div>
-                                 <select value={user.currency} onChange={(e) => { const u = { ...user, currency: e.target.value as CurrencyCode }; setUser(u); sbUpdateProfile(user.id, u); }} className="bg-gray-100 dark:bg-gray-800 border-none rounded-xl py-2 px-4 font-bold text-sm outline-none cursor-pointer">
-                                     {Object.keys(CURRENCY_SYMBOLS).map(c => <option key={c} value={c}>{c}</option>)}
-                                 </select>
-                             </div>
-                         </GlassCard>
-
-                         {/* ACCOUNT SECURITY */}
-                         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 ml-2">Account Security</h3>
-                         <GlassCard className="p-2 mb-8 space-y-1">
-                             <div className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-2xl transition-colors cursor-pointer" onClick={() => setResetMode(true)}>
-                                 <div className="flex items-center gap-4">
-                                     <div className="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-xl"><KeyRound size={20}/></div>
-                                     <div><p className="font-bold text-gray-900 dark:text-white">Change Password</p><p className="text-xs text-gray-500">Update your login credentials</p></div>
-                                 </div>
-                                 <ChevronRight size={20} className="text-gray-400"/>
-                             </div>
-                         </GlassCard>
-
-                         {/* DATA MANAGEMENT */}
-                         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 ml-2">Data Management</h3>
-                         <GlassCard className="p-2 mb-8 space-y-1">
-                             <div className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-2xl transition-colors cursor-pointer">
-                                 <div className="flex items-center gap-4">
-                                     <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-xl"><Download size={20}/></div>
-                                     <div><p className="font-bold text-gray-900 dark:text-white">Export Data</p><p className="text-xs text-gray-500">Download transaction history (CSV)</p></div>
-                                 </div>
-                                 <button className="text-xs font-bold bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">Download</button>
-                             </div>
-                             <div className="flex items-center justify-between p-4 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl transition-colors cursor-pointer" onClick={() => setDeleteConfirm(true)}>
-                                 <div className="flex items-center gap-4">
-                                     <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl"><Trash2 size={20}/></div>
-                                     <div><p className="font-bold text-red-600 dark:text-red-400">Clear All Data</p><p className="text-xs text-red-400/70">Permanently delete all transactions</p></div>
-                                 </div>
-                             </div>
-                         </GlassCard>
-
-                         {/* Delete Confirm Modal */}
-                         {deleteConfirm && (
-                             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                                 <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl max-w-sm w-full shadow-2xl animate-slide-up">
-                                     <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mb-4 mx-auto"><ShieldAlert size={32}/></div>
-                                     <h3 className="text-xl font-bold text-center mb-2 dark:text-white">Are you sure?</h3>
-                                     <p className="text-center text-gray-500 text-sm mb-6">This action cannot be undone. All your transaction data will be erased.</p>
-                                     <div className="flex gap-3">
-                                         <button onClick={() => setDeleteConfirm(false)} className="flex-1 py-3 font-bold bg-gray-100 dark:bg-gray-800 rounded-xl dark:text-white">Cancel</button>
-                                         <button onClick={handleClearData} className="flex-1 py-3 font-bold bg-red-600 text-white rounded-xl hover:bg-red-700">Yes, Delete</button>
-                                     </div>
-                                 </div>
-                             </div>
-                         )}
-                    </div>
-                )}
-                
-                {(view === ViewState.HOME || view === ViewState.EXPENSES || view === ViewState.INCOME) && (
-                    <DashboardContent view={view} user={user} transactions={transactions} balance={balance} income={income} expense={expense} onAddTx={handleAddTx} onDeleteTx={handleDeleteTx} onOpenAi={() => setShowAiChat(true)} />
-                )}
+                                    </div>
+                                </div>
+                            </GlassCard>
+                        </div>
+                    )}
+                </div>
             </main>
-
-            {/* FLOATING AI BUTTON - ALWAYS VISIBLE */}
-            <button 
-                onClick={() => setShowAiChat(true)}
-                className="fixed bottom-6 right-6 z-50 p-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-[0_8px_30px_rgb(79,70,229,0.4)] transition-all hover:scale-110 active:scale-95 group"
-            >
-                <div className="absolute inset-0 bg-white/20 rounded-full animate-ping opacity-20 group-hover:opacity-40"></div>
-                <Bot size={28} />
-            </button>
 
             {/* AI CHAT MODAL */}
             {showAiChat && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4" onClick={(e) => { if(e.target === e.currentTarget) setShowAiChat(false); }}>
-                    <div className="bg-white dark:bg-gray-900 w-full md:max-w-2xl h-[85vh] md:h-[600px] rounded-t-[2.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col relative overflow-hidden animate-slide-up border border-gray-200 dark:border-gray-700">
-                        {/* Header */}
-                        <div className="p-6 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center z-10">
-                             <div className="flex items-center gap-4">
-                                 <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-500/30">
-                                     <Bot size={24} />
+                <div className="fixed inset-0 z-[60] glass-morphism backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-10 animate-fade-in" onClick={(e) => { if(e.target === e.currentTarget) setShowAiChat(false); }}>
+                    <div className="bg-white dark:bg-gray-950 w-full md:max-w-3xl h-[90vh] md:h-[700px] rounded-t-[3rem] md:rounded-[3rem] shadow-[0_40px_100px_rgba(0,0,0,0.3)] flex flex-col relative overflow-hidden animate-slide-up border border-white/20 dark:border-gray-800">
+                        <div className="p-8 bg-brand-600 text-white flex justify-between items-center z-10">
+                             <div className="flex items-center gap-5">
+                                 <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-md shadow-inner">
+                                     <Bot size={32} />
                                  </div>
                                  <div>
-                                     <h3 className="font-black text-xl text-gray-900 dark:text-white tracking-tight">Money Brain</h3>
+                                     <h3 className="font-black text-2xl tracking-tighter">Money Strategic Brain</h3>
                                      <div className="flex items-center gap-2">
-                                         <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Online</p>
+                                         <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(52,211,153,1)]"></span>
+                                         <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Quantum Processor Active</p>
                                      </div>
                                  </div>
                              </div>
-                             <button onClick={() => setShowAiChat(false)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><X size={20} className="text-gray-600 dark:text-gray-300"/></button>
+                             <button onClick={() => setShowAiChat(false)} className="p-4 bg-white/10 rounded-full hover:bg-white/20 transition-all active:scale-75"><X size={24} /></button>
                         </div>
-                        
-                        {/* Chat Area */}
-                        <div className="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-[#0b0f19] custom-scrollbar">
+                        <div className="flex-1 p-8 overflow-y-auto bg-gray-50/50 dark:bg-[#0b0f19] custom-scrollbar space-y-8">
                             {chatResponse ? (
-                                <div className="space-y-6">
-                                    <div className="flex justify-end">
-                                        <div className="bg-indigo-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] shadow-md">
-                                            <p className="font-medium leading-relaxed">{chatQuery}</p>
+                                <div className="space-y-8">
+                                    <div className="flex justify-end animate-slide-up">
+                                        <div className="bg-brand-600 text-white p-6 rounded-3xl rounded-tr-none max-w-[85%] shadow-xl font-bold leading-relaxed">
+                                            {chatQuery}
                                         </div>
                                     </div>
-                                    <div className="flex justify-start gap-4">
-                                        <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center shrink-0 mt-2">
-                                            <Bot size={16} className="text-white"/>
+                                    <div className="flex justify-start gap-5 animate-slide-up" style={{ animationDelay: '200ms' }}>
+                                        <div className="w-10 h-10 rounded-2xl bg-brand-600 flex items-center justify-center shrink-0 mt-2 shadow-lg">
+                                            <Bot size={20} className="text-white"/>
                                         </div>
-                                        <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 rounded-2xl rounded-tl-none max-w-[90%] shadow-sm prose dark:prose-invert">
-                                            <div dangerouslySetInnerHTML={{ __html: chatResponse.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }} />
+                                        <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] rounded-tl-none max-w-[90%] shadow-sm prose dark:prose-invert font-medium text-gray-700 dark:text-gray-300 leading-loose border border-gray-100 dark:border-gray-800">
+                                            <div dangerouslySetInnerHTML={{ __html: chatResponse.replace(/\*\*(.*?)\*\*/g, '<strong class="text-brand-600 dark:text-brand-400">$1</strong>').replace(/\n/g, '<br/>') }} />
                                         </div>
                                     </div>
-                                    <div className="flex justify-center pt-8">
-                                        <button onClick={() => { setChatResponse(""); setChatQuery(""); }} className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white px-6 py-2.5 rounded-full font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm">
-                                            <RefreshCw size={14}/> New Analysis
+                                    <div className="flex justify-center pt-10">
+                                        <button onClick={() => { setChatResponse(""); setChatQuery(""); }} className="flex items-center gap-3 bg-white dark:bg-gray-900 border-2 border-brand-100 dark:border-gray-800 text-brand-600 dark:text-brand-400 px-8 py-4 rounded-full font-black text-xs uppercase tracking-widest hover:bg-brand-50 transition-all shadow-md active:scale-95">
+                                            <RefreshCw size={16}/> New Strategic Query
                                         </button>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-                                    <Bot size={64} className="text-indigo-300 dark:text-indigo-900 mb-6" />
-                                    <h4 className="font-black text-2xl text-gray-900 dark:text-white mb-2">How can I help?</h4>
-                                    <p className="text-sm font-medium text-gray-500 max-w-xs leading-relaxed">I can analyze your spending, suggest budget cuts, or plan your investments.</p>
+                                <div className="h-full flex flex-col items-center justify-center text-center">
+                                    <div className="p-8 bg-brand-50 dark:bg-brand-900/10 rounded-full mb-8 animate-float">
+                                        <Bot size={100} className="text-brand-600 opacity-40" />
+                                    </div>
+                                    <h4 className="font-black text-3xl text-gray-950 dark:text-white mb-3 tracking-tighter">Strategic Insights Await</h4>
+                                    <p className="text-sm font-bold text-gray-500 max-w-sm leading-relaxed uppercase tracking-wide opacity-60">Ready to optimize your net worth or simulate retirement scenarios.</p>
                                 </div>
                             )}
                         </div>
-
-                        {/* Input Area */}
                         {!chatResponse && (
-                            <div className="p-4 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 z-10">
-                                <div className="relative flex items-center gap-2">
+                            <div className="p-8 glass-morphism z-10">
+                                <div className="relative flex items-center gap-4">
                                     <input 
+                                        autoFocus
                                         value={chatQuery}
                                         onChange={e => setChatQuery(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && handleAskAi()}
-                                        placeholder="Ask for financial advice..."
-                                        className="w-full bg-gray-100 dark:bg-gray-800 rounded-2xl p-4 pr-14 font-bold outline-none focus:ring-2 ring-indigo-500 transition-all text-gray-900 dark:text-white placeholder-gray-400"
+                                        placeholder="Ask for strategic advice..."
+                                        className="w-full bg-white dark:bg-gray-900 rounded-[2rem] p-6 pr-20 font-bold outline-none ring-4 ring-transparent focus:ring-brand-500/10 transition-all text-gray-900 dark:text-white placeholder-gray-400 shadow-xl border border-gray-100 dark:border-gray-800"
                                         disabled={chatLoading}
                                     />
                                     <button 
                                         onClick={handleAskAi}
                                         disabled={chatLoading || !chatQuery}
-                                        className="absolute right-2 top-2 p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-500/30 hover:bg-indigo-500 disabled:opacity-50 transition-all"
+                                        className="absolute right-3 top-3 p-4 bg-brand-600 text-white rounded-2xl shadow-xl shadow-brand-500/30 hover:bg-brand-500 disabled:opacity-50 transition-all active:scale-90"
                                     >
-                                        {chatLoading ? <Loader2 className="animate-spin" size={20} /> : <ArrowUpCircle size={20} />}
+                                        {chatLoading ? <Loader2 className="animate-spin" size={24} /> : <ArrowUpCircle size={24} />}
                                     </button>
                                 </div>
                             </div>
@@ -963,9 +686,246 @@ const App = () => {
                     </div>
                 </div>
             )}
+
+            {/* QUICK ADD TRANSACTION MODAL */}
+            {showAddTxModal && (
+                <div className="fixed inset-0 z-[70] glass-morphism backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" onClick={(e) => { if(e.target === e.currentTarget) setShowAddTxModal(false); }}>
+                    <div className="bg-white dark:bg-gray-950 w-full max-w-lg rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.3)] p-8 animate-scale-up border border-gray-100 dark:border-gray-800 relative">
+                        <button onClick={() => setShowAddTxModal(false)} className="absolute top-6 right-6 p-2 text-gray-400 hover:text-rose-500 transition-colors"><X size={24}/></button>
+                        <h3 className="text-2xl font-black mb-6 tracking-tight flex items-center gap-2"><Plus className="text-emerald-600" size={24}/> Log Transaction</h3>
+                        <AddTransactionForm onAdd={handleAddTx} user={user} />
+                    </div>
+                </div>
+            )}
         </div>
     </div>
   );
+};
+
+// Sub-component for Transaction History
+const TransactionHistoryList = ({ transactions, onDeleteTx, user }: any) => (
+    <GlassCard className="p-8">
+        <h3 className="text-xl font-black text-gray-950 dark:text-white tracking-tight mb-8">History Log</h3>
+        <div className="space-y-4">
+            {transactions.length === 0 ? (
+                <div className="py-20 text-center opacity-40">
+                    <p className="font-bold text-gray-500 uppercase tracking-widest text-[10px]">No Data Recorded</p>
+                </div>
+            ) : (
+                transactions.map((t: Transaction, i: number) => (
+                    <div key={t.id} className="flex items-center justify-between p-4 glass-morphism rounded-3xl border-transparent hover:border-brand-500/30 transition-all duration-300 group cursor-default">
+                        <div className="flex items-center gap-4">
+                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${t.type === TransactionType.INCOME ? 'bg-emerald-100/50 text-emerald-600 dark:bg-emerald-500/10' : 'bg-rose-100/50 text-rose-600 dark:bg-rose-500/10'}`}>
+                                {t.type === TransactionType.INCOME ? <ArrowUpCircle size={24}/> : <ArrowDownCircle size={24}/>}
+                            </div>
+                            <div>
+                                <p className="font-black text-gray-950 dark:text-white text-base tracking-tight">{t.title}</p>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{t.category} • {new Date(t.date).toLocaleDateString()}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <span className={`font-black text-xl tracking-tighter ${t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-gray-900 dark:text-white'}`}>
+                                {t.type === TransactionType.EXPENSE ? '-' : '+'}<AnimatedNumber value={t.amount} currency={user.currency} privacyMode={user.privacyMode} precision={0} />
+                            </span>
+                            <button onClick={() => onDeleteTx(t.id)} className="text-gray-300 hover:text-rose-500 transition-all opacity-0 group-hover:opacity-100"><Trash2 size={18}/></button>
+                        </div>
+                    </div>
+                ))
+            )}
+        </div>
+    </GlassCard>
+);
+
+// Form for Adding Transactions
+const AddTransactionForm = ({ onAdd, user }: any) => {
+    const [title, setTitle] = useState('');
+    const [amount, setAmount] = useState('');
+    const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
+    const [category, setCategory] = useState('');
+
+    const availableCategories = type === TransactionType.INCOME ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
+    useEffect(() => {
+        setCategory(availableCategories[0]);
+    }, [type]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const amtValue = parseFloat(amount);
+        if (!title || isNaN(amtValue)) return;
+        onAdd(title, amtValue, type, category);
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="flex p-1.5 bg-gray-100 dark:bg-gray-800 rounded-2xl">
+                <button type="button" onClick={() => setType(TransactionType.EXPENSE)} className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${type === TransactionType.EXPENSE ? 'bg-white dark:bg-gray-700 shadow-md text-rose-500' : 'text-gray-400'}`}>Expense</button>
+                <button type="button" onClick={() => setType(TransactionType.INCOME)} className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${type === TransactionType.INCOME ? 'bg-white dark:bg-gray-700 shadow-md text-emerald-500' : 'text-gray-400'}`}>Income</button>
+            </div>
+            
+            <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Description</label>
+                <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Rent, Salary, Dinner..." className="w-full bg-gray-50 dark:bg-gray-900 p-5 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-brand-500 transition-all text-gray-950 dark:text-white"/>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Amount</label>
+                    <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400">{CURRENCY_SYMBOLS[user.currency as CurrencyCode]}</span>
+                        <input type="number" step="any" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" className="w-full bg-gray-50 dark:bg-gray-900 p-5 pl-10 rounded-2xl font-black outline-none border-2 border-transparent focus:border-brand-500 transition-all text-gray-950 dark:text-white"/>
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Category</label>
+                    <select value={category} onChange={e=>setCategory(e.target.value)} className="w-full bg-gray-50 dark:bg-gray-900 p-5 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-brand-500 transition-all text-gray-950 dark:text-white appearance-none cursor-pointer">
+                        {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" className="w-full bg-brand-600 hover:bg-brand-500 text-white p-5 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all mt-4">Save Entry</button>
+        </form>
+    );
+};
+
+const AuthScreen = ({ onLogin }: { onLogin: (user: UserProfile) => void }) => {
+    const [isSignup, setIsSignup] = useState(false);
+    const [isReset, setIsReset] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [name, setName] = useState('');
+    const [currency, setCurrency] = useState<CurrencyCode>('USD');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setMessage(null);
+        setLoading(true);
+
+        try {
+            if (isReset) {
+                const { success, error } = await sbResetPassword(email);
+                if (success) setMessage("Password reset link sent to your email.");
+                else setError(error);
+            } else if (isSignup) {
+                const { success, error, msg } = await sbSignup(email, password, name, currency);
+                if (success) setMessage(msg || "Signup successful! Please check your email or log in.");
+                else setError(error);
+            } else {
+                const { user, error } = await sbLogin(email, password);
+                if (user) onLogin(user);
+                else setError(error);
+            }
+        } catch (err: any) {
+            setError(err.message || "An unexpected error occurred.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (window.location.hash.includes('reset-password')) {
+        return <ResetPasswordPage onCancel={() => { window.location.hash = ""; window.location.reload(); }} />;
+    }
+
+    return (
+        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden font-sans">
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[120px]"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 rounded-full blur-[120px]"></div>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-2xl border border-white/10 w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl relative z-10">
+                <div className="flex justify-center mb-6">
+                    <div className="bg-gradient-to-tr from-indigo-500 to-purple-600 p-5 rounded-2xl shadow-[0_0_20px_rgba(99,102,241,0.5)]">
+                        <Wallet size={32} className="text-white" />
+                    </div>
+                </div>
+                
+                <h2 className="text-3xl font-black text-center mb-2 text-white tracking-tight">
+                    {isReset ? "Reset Access" : isSignup ? "Create Account" : "Welcome Back"}
+                </h2>
+                <p className="text-center text-indigo-200 mb-8 font-medium text-sm">
+                    {isReset ? "We'll send you a recovery link" : isSignup ? "Join Money Master Pro today" : "Login to your secure dashboard"}
+                </p>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    {isSignup && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 ml-1 uppercase tracking-wider">Full Name</label>
+                            <input 
+                                value={name} onChange={e => setName(e.target.value)}
+                                className="w-full bg-black/30 border border-white/10 focus:border-indigo-500 rounded-xl p-4 font-bold outline-none text-white transition-all" 
+                                placeholder="John Doe" required={isSignup}
+                            />
+                        </div>
+                    )}
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-400 ml-1 uppercase tracking-wider">Email Address</label>
+                        <input 
+                            type="email" value={email} onChange={e => setEmail(e.target.value)}
+                            className="w-full bg-black/30 border border-white/10 focus:border-indigo-500 rounded-xl p-4 font-bold outline-none text-white transition-all" 
+                            placeholder="name@company.com" required
+                        />
+                    </div>
+                    {!isReset && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 ml-1 uppercase tracking-wider">Password</label>
+                            <input 
+                                type="password" value={password} onChange={e => setPassword(e.target.value)}
+                                className="w-full bg-black/30 border border-white/10 focus:border-indigo-500 rounded-xl p-4 font-bold outline-none text-white transition-all" 
+                                placeholder="••••••••" required={!isReset} minLength={6}
+                            />
+                        </div>
+                    )}
+                    {isSignup && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 ml-1 uppercase tracking-wider">Preferred Currency</label>
+                            <select 
+                                value={currency} onChange={e => setCurrency(e.target.value as CurrencyCode)}
+                                className="w-full bg-black/30 border border-white/10 focus:border-indigo-500 rounded-xl p-4 font-bold outline-none text-white transition-all appearance-none"
+                            >
+                                <option value="USD">USD ($)</option>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="GBP">GBP (£)</option>
+                                <option value="INR">INR (₹)</option>
+                                <option value="JPY">JPY (¥)</option>
+                            </select>
+                        </div>
+                    )}
+
+                    <button disabled={loading} type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 rounded-xl shadow-lg mt-4 flex items-center justify-center gap-2 transition-all transform active:scale-95 disabled:opacity-50">
+                        {loading ? <Loader2 className="animate-spin" /> : (isReset ? "SEND LINK" : isSignup ? "CREATE ACCOUNT" : "SIGN IN")}
+                    </button>
+                </form>
+
+                <div className="mt-8 pt-6 border-t border-white/10 flex flex-col gap-3">
+                    {!isReset ? (
+                        <>
+                            <button onClick={() => setIsSignup(!isSignup)} className="text-center text-xs font-bold text-indigo-300 hover:text-white transition-colors">
+                                {isSignup ? "ALREADY HAVE AN ACCOUNT? LOG IN" : "NEED AN ACCOUNT? SIGN UP"}
+                            </button>
+                            {!isSignup && (
+                                <button onClick={() => setIsReset(true)} className="text-center text-xs font-bold text-gray-400 hover:text-white transition-colors">
+                                    FORGOT PASSWORD?
+                                </button>
+                            )}
+                        </>
+                    ) : (
+                        <button onClick={() => setIsReset(false)} className="text-center text-xs font-bold text-indigo-300 hover:text-white transition-colors">
+                            BACK TO LOGIN
+                        </button>
+                    )}
+                </div>
+
+                {error && <div className="mt-4 p-4 bg-rose-500/20 border border-rose-500/30 text-rose-200 rounded-xl text-xs font-bold text-center">{error}</div>}
+                {message && <div className="mt-4 p-4 bg-emerald-500/20 border border-emerald-500/30 text-emerald-200 rounded-xl text-xs font-bold text-center">{message}</div>}
+            </div>
+        </div>
+    );
 };
 
 export default App;

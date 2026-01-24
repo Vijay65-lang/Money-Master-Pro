@@ -1,6 +1,8 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Transaction } from "../types";
 
+// Initialize Gemini AI client with named parameter
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getFinancialAdvice = async (
@@ -10,7 +12,8 @@ export const getFinancialAdvice = async (
   if (!process.env.API_KEY) return "API Key is missing. Please configure your environment variables in Vercel.";
 
   try {
-    const model = "gemini-2.5-flash";
+    // Using gemini-3-flash-preview for financial advice summary as per guidelines
+    const model = "gemini-3-flash-preview";
     const systemInstruction = `You are 'Money Master Brain', an elite financial strategist for the 'Money Master Pro' app.
 
     YOUR STYLE:
@@ -41,6 +44,7 @@ export const getFinancialAdvice = async (
       },
     });
 
+    // Access .text property directly
     return response.text || "I couldn't generate a response at this time.";
   } catch (error) {
     console.error("Gemini API Error:", error);
@@ -52,10 +56,12 @@ export const categorizeExpense = async (title: string): Promise<string> => {
   if (!process.env.API_KEY) return "Others";
 
   try {
+    // Using gemini-3-flash-preview for categorization tasks
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: `Categorize this expense title into one of these exact categories: Food, Travel, Shopping, Bills & EMI, Movies/Fun, Groceries, Medical, Others. Return ONLY the category name. Title: "${title}"`,
     });
+    // Access .text property directly
     return response.text?.trim() || "Others";
   } catch (e) {
     return "Others";

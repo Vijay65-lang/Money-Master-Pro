@@ -69,14 +69,25 @@ export const sbLogin = async (email: string, password: string): Promise<{ user: 
                     lastLogin: Date.now(),
                     cloudConnected: true
                 };
-                await supabase.from("profiles").insert({ id: data.user.id, email: data.user.email, data: profile });
+                
+                // Don't let database insertion failure stop the login process
+                try {
+                    await supabase.from("profiles").upsert({ 
+                        id: data.user.id, 
+                        email: data.user.email, 
+                        data: profile 
+                    });
+                } catch (e) {
+                    console.warn("Profile couldn't be synced to cloud during login, using local profile.");
+                }
             }
             
             return { user: profile, error: null };
         }
-        return { user: null, error: "Login failed." };
+        return { user: null, error: "Authentication returned no user data." };
     } catch (e: any) {
-        return { user: null, error: "Connection error." };
+        console.error("Login exception:", e);
+        return { user: null, error: e.message || "Connection error during login." };
     }
 };
 
@@ -111,19 +122,34 @@ export const sbSignup = async (
                 lastLogin: Date.now(),
                 cloudConnected: true,
             };
-            await supabase.from("profiles").insert({ id: data.user.id, email, data: newUser });
+            
+            try {
+                await supabase.from("profiles").upsert({ 
+                    id: data.user.id, 
+                    email: email, 
+                    data: newUser 
+                });
+            } catch (e) {
+                console.warn("Profile table missing? Signup successful but profile cloud sync failed.");
+            }
+            
             return { success: true, error: null };
         }
 
-        // If no session, email confirmation is likely required
+        // If no session, email confirmation is likely required by Supabase settings
         if (data.user && !data.session) {
-            return { success: true, error: null, msg: "Account created! Please check your email to confirm." };
+            return { 
+                success: true, 
+                error: null, 
+                msg: "Success! We sent a confirmation link to your email. Please verify it before logging in." 
+            };
         }
 
-        return { success: false, error: "Signup failed." };
+        return { success: false, error: "Signup process completed but returned no user info." };
 
     } catch (e: any) {
-        return { success: false, error: "Connection error." };
+        console.error("Signup exception:", e);
+        return { success: false, error: e.message || "Connection error during signup." };
     }
 };
 
@@ -131,10 +157,7 @@ export const sbResetPassword = async (email: string): Promise<{ success: boolean
     if (!isConfigured()) return { success: false, error: "Database keys invalid." };
     
     // Explicitly append /#reset-password to ensure the app detects the route on return
-    // e.g. https://your-app.vercel.app/#reset-password
     const redirectUrl = `${window.location.origin}/#reset-password`;
-
-    console.log("🔒 requesting password reset redirect to:", redirectUrl);
 
     try {
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
@@ -142,8 +165,8 @@ export const sbResetPassword = async (email: string): Promise<{ success: boolean
         });
         if (error) return { success: false, error: error.message };
         return { success: true, error: null };
-    } catch (e) {
-        return { success: false, error: "Connection error." };
+    } catch (e: any) {
+        return { success: false, error: e.message || "Connection error." };
     }
 };
 
@@ -166,7 +189,10 @@ export const sbGetProfile = async (userId: string): Promise<UserProfile | null> 
     if (!isConfigured()) return null;
     try {
         const { data, error } = await supabase.from("profiles").select("data").eq("id", userId).single();
-        if (error) { if (error.code !== 'PGRST116') handleDbError("Get Profile", error); return null; }
+        if (error) { 
+            if (error.code !== 'PGRST116') handleDbError("Get Profile", error); 
+            return null; 
+        }
         return data.data as UserProfile;
     } catch { return null; }
 };
@@ -187,8 +213,12 @@ export const sbGetOrCreateProfile = async (authUser: any): Promise<UserProfile |
                 lastLogin: Date.now(),
                 cloudConnected: true
             };
-            // Use upsert to be safe
-            await supabase.from("profiles").upsert({ id: authUser.id, email: authUser.email, data: profile });
+            // Try to sync but don't crash
+            try {
+                await supabase.from("profiles").upsert({ id: authUser.id, email: authUser.email, data: profile });
+            } catch (e) {
+                console.warn("Profile upsert failed during creation fallback.");
+            }
         }
         return profile;
     } catch (e) {
